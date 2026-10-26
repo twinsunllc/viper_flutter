@@ -124,8 +124,10 @@ A report carries the last 200 console lines and 100 network calls, as on the web
   like). Never a body. It doesn't see web sockets or native SDKs' own traffic.
 - At Strict and Maximum, console text is masked and queries are stripped (D80).
 
-Viper wraps the `HttpOverrides` current when `Viper.start` runs, which is why `onBoot` comes before
-the app builds its clients. An override the app installs later (certificate pinning) must chain to
+Viper chains to the error handlers set when `Viper.start` runs: set Crashlytics (or any
+`FlutterError.onError` and `PlatformDispatcher.onError`) before `onBoot`, or a handler set later
+replaces Viper's and the console loses those errors. It wraps the `HttpOverrides` current when
+`Viper.start` runs too, which is why `onBoot` comes before the app builds its clients. An override the app installs later (certificate pinning) must chain to
 the one before it:
 
 ```dart

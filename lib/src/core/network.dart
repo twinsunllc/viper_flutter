@@ -55,7 +55,10 @@ class ViperHttpClient implements HttpClient {
         ..error = _short(error);
       rethrow;
     }
-    // The answer arrives on `done`, the same future close() returns; listening changes nothing.
+    // The answer arrives on `done`, the same future close() returns. Listening to it changes
+    // nothing for an app that awaits close(), as apps do; one that fires close() off and never
+    // handles its error no longer sees that error reach the zone as unhandled, since this
+    // listener handles it. Dart can't tell whether anyone else listens, so it stays this way.
     unawaited(
       request.done.then(
         (response) {

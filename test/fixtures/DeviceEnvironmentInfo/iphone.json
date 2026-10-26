@@ -1,12 +1,28 @@
 {
   "platform": "flutter",
-  "device": { "model": "iPhone 16", "manufacturer": "Apple", "physical": true, "tablet": false },
-  "os": { "name": "iOS", "version": "26.1" },
+  "device": {
+    "model": "iPhone 16",
+    "manufacturer": "Apple",
+    "physical": true,
+    "tablet": false
+  },
+  "os": {
+    "name": "iOS",
+    "version": "26.1"
+  },
   "screen": {
-    "logical": { "width": 393, "height": 852 },
-    "device_pixel_ratio": 3,
+    "logical": {
+      "width": 393.0,
+      "height": 852.0
+    },
+    "device_pixel_ratio": 3.0,
     "orientation": "portrait",
-    "padding": { "top": 59, "bottom": 34, "left": 0, "right": 0 },
+    "padding": {
+      "top": 59.0,
+      "bottom": 34.0,
+      "left": 0.0,
+      "right": 0.0
+    },
     "keyboard_open": false
   },
   "preferences": {
@@ -17,11 +33,31 @@
     "high_contrast": false,
     "screen_reader": false,
     "locale": "en-US",
-    "locales": ["en-US"],
-    "timezone": "America/Los_Angeles"
+    "locales": [
+      "en-US",
+      "zh-CN"
+    ],
+    "timezone": "Pacific/Honolulu"
   },
-  "connection": { "type": "wifi", "online": true },
-  "app": { "id": "dev.twinsun.viper.example", "build": "2.4.0+311", "flutter_version": "3.44.0", "environment": "staging" },
-  "screenshot": { "method": "native", "platform_views_blocked": false },
-  "time": { "captured_at": "2026-10-25T20:14:00Z", "app_open_ms": 182000 }
+  "connection": {
+    "type": "wifi",
+    "online": true
+  },
+  "app": {
+    "id": "dev.twinsun.viper.example",
+    "build": "0.1.0+1",
+    "flutter_version": "3.44.0",
+    "environment": "staging",
+    "context": {
+      "plan": "pro"
+    }
+  },
+  "screenshot": {
+    "method": "none",
+    "platform_views_blocked": false
+  },
+  "time": {
+    "captured_at": "2026-10-26T19:00:00.000Z",
+    "app_open_ms": 42000
+  }
 }

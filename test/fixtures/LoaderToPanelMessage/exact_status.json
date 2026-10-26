@@ -1,0 +1,5 @@
+{
+  "type": "viper:exact:status",
+  "granted": false,
+  "reason": "unsupported"
+}

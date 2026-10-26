@@ -1,0 +1,59 @@
+{
+  "type": "viper:config",
+  "config": {
+    "ok": true,
+    "environment": {
+      "id": "6c1d1d3e-8b7a-4e39-9a51-1f3c2b0d9e01",
+      "kind": "staging",
+      "name": "Staging"
+    },
+    "project": {
+      "id": "0f6f2f0a-5a2e-4b8e-9a53-2f5d0c7b1e22",
+      "name": "Viper example",
+      "slug": "viper-example",
+      "privacy_level": "standard",
+      "modules_enabled": true,
+      "sign_off_enabled": true,
+      "docked_allowed": false,
+      "shake_to_open": true
+    },
+    "launcher": {
+      "style": "corner",
+      "spot": "bottom-right",
+      "raise": 0,
+      "edge_side": "right",
+      "edge_position": 50
+    },
+    "build": null,
+    "capture": {
+      "replay_seconds": 60,
+      "exact_screenshots": false,
+      "mask_selectors": [],
+      "block_selectors": [],
+      "unmask_selectors": []
+    },
+    "urls": {
+      "panel": "http://localhost:4830/panel?key=hbr_loc_9w",
+      "cable": "ws://localhost:4830/cable",
+      "sign_in_popup": "http://localhost:4830/widget/sign_in",
+      "privacy": "http://localhost:4830/privacy"
+    },
+    "capture_notice": {
+      "version": 1,
+      "summary": "Viper captures the screen when you report."
+    }
+  },
+  "screen": {
+    "route": "/",
+    "url": "",
+    "title": "Home",
+    "build": "0.1.0+1"
+  },
+  "state": {
+    "view": "compose",
+    "draft": {
+      "body": "Save is grey",
+      "scope": "screen"
+    }
+  }
+}

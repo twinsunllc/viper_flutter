@@ -1,0 +1,14 @@
+{
+  "type": "viper:pick:none",
+  "scope": "screen",
+  "label": "Whole screen",
+  "context": {
+    "path": [
+      {
+        "label": "Whole screen"
+      }
+    ],
+    "index": 0,
+    "mode": "screen"
+  }
+}

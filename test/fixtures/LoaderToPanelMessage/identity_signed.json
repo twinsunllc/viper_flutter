@@ -1,0 +1,14 @@
+{
+  "type": "viper:identity",
+  "identity": {
+    "v": 1,
+    "payload": {
+      "id": "u_7",
+      "email": "dana@example.com",
+      "name": "Dana Ortiz",
+      "iat": 1793041200,
+      "exp": 1793044800
+    },
+    "signature": "a1b2c3"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "type": "viper:pick:result",
+  "anchor": {
+    "locators": {
+      "widget": "ElevatedButton",
+      "key": "save-cast",
+      "semantics": "Save",
+      "text": "Save",
+      "position": {
+        "x": 242,
+        "y": 506,
+        "width": 104,
+        "height": 48
+      }
+    }
+  },
+  "label": "Save button",
+  "scope": "element",
+  "context": {
+    "path": [
+      {
+        "label": "Edit cast dialog"
+      },
+      {
+        "label": "Save button"
+      }
+    ],
+    "index": 1,
+    "mode": "element",
+    "surface": {
+      "kind": "dialog",
+      "key": "EditCastDialog",
+      "name": "Edit cast"
+    },
+    "view": {
+      "x": 242,
+      "y": 506,
+      "width": 104,
+      "height": 48,
+      "viewport_width": 412,
+      "viewport_height": 915
+    }
+  }
+}

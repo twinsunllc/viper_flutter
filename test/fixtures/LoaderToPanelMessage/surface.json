@@ -1,0 +1,8 @@
+{
+  "type": "viper:surface",
+  "surface": {
+    "kind": "dialog",
+    "key": "EditCastDialog",
+    "name": "Edit cast"
+  }
+}

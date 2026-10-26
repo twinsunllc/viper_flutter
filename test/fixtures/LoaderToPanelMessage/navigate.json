@@ -1,0 +1,9 @@
+{
+  "type": "viper:navigate",
+  "screen": {
+    "route": "/crew-list",
+    "url": "",
+    "title": "Crew list",
+    "build": "2.4.0+311"
+  }
+}

@@ -1,4 +1,20 @@
 {
+  "scope": "element",
+  "body": "Save does nothing\nTapping Save on the cast dialog leaves it open and nothing changes.",
+  "anchor": {
+    "locators": {
+      "widget": "ElevatedButton",
+      "key": "save-cast",
+      "semantics": "Save",
+      "text": "Save",
+      "position": {
+        "x": 242,
+        "y": 506,
+        "width": 104,
+        "height": 48
+      }
+    }
+  },
   "key": "hbr_loc_9w",
   "platform": "flutter",
   "screen": {
@@ -6,49 +22,76 @@
     "url": "",
     "title": "Cast hub",
     "build": "2.4.0+311",
-    "surface": { "kind": "dialog", "key": "EditCastDialog", "name": "Edit cast" }
-  },
-  "scope": "element",
-  "body": "Save does nothing\nTapping Save on the cast dialog leaves it open and nothing changes.",
-  "privacy_level": "standard",
-  "anchor": {
-    "locators": {
-      "widget": "ElevatedButton",
-      "key": "save-cast",
-      "semantics": "Save",
-      "text": "Save",
-      "position": { "x": 24, "y": 612, "width": 345, "height": 48 }
+    "surface": {
+      "kind": "dialog",
+      "key": "EditCastDialog",
+      "name": "Edit cast"
     }
   },
   "env": {
     "platform": "flutter",
-    "device": { "model": "Pixel 9", "manufacturer": "Google", "physical": true, "tablet": false },
-    "os": { "name": "Android", "version": "16", "sdk_int": 36 },
+    "device": {
+      "model": "Pixel 9",
+      "manufacturer": "Google",
+      "physical": true,
+      "tablet": false
+    },
+    "os": {
+      "name": "Android",
+      "version": "16",
+      "sdk_int": 36
+    },
     "screen": {
-      "logical": { "width": 412, "height": 915 },
+      "logical": {
+        "width": 412.0,
+        "height": 915.0
+      },
       "device_pixel_ratio": 2.625,
       "orientation": "portrait",
-      "padding": { "top": 24, "bottom": 24, "left": 0, "right": 0 },
+      "padding": {
+        "top": 67.43,
+        "bottom": 38.86,
+        "left": 0.0,
+        "right": 0.0
+      },
       "keyboard_open": false
     },
     "preferences": {
-      "brightness": "dark",
-      "text_scale": 1.15,
+      "brightness": "light",
+      "text_scale": 1.0,
       "bold_text": false,
       "reduced_motion": false,
       "high_contrast": false,
-      "screen_reader": true,
+      "screen_reader": false,
       "locale": "en-US",
-      "locales": ["en-US", "es-US"],
-      "timezone": "America/Chicago"
+      "locales": [
+        "en-US",
+        "zh-CN"
+      ],
+      "timezone": "Pacific/Honolulu"
     },
-    "connection": { "type": "cellular", "online": true },
-    "app": { "id": "dev.twinsun.viper.example", "build": "2.4.0+311", "environment": "local", "context": { "plan": "crew" } },
-    "screenshot": { "method": "native", "platform_views_blocked": false },
-    "time": { "captured_at": "2026-10-25T20:14:00Z", "app_open_ms": 41000 }
+    "connection": {
+      "type": "wifi",
+      "online": true
+    },
+    "app": {
+      "id": "dev.twinsun.viper.example",
+      "build": "2.4.0+311",
+      "flutter_version": "3.44.0",
+      "environment": "staging"
+    },
+    "screenshot": {
+      "method": "native",
+      "platform_views_blocked": false
+    },
+    "time": {
+      "captured_at": "2026-10-26T19:00:00.000Z",
+      "app_open_ms": 42000
+    }
   },
   "build": "2.4.0+311",
-  "device_picture": "eyJfcmFpbHMiOnsiZGF0YSI6MSwicHVyIjoiZGV2aWNlX3BpY3R1cmUifX0=--0f3c",
+  "privacy_level": "standard",
   "asset_manifest": {},
-  "assets_skipped": []
+  "assets_skipped": [],
+  "device_picture": "pic-1"
 }

@@ -58,6 +58,8 @@ class _ViperLayer extends StatelessWidget {
       // Viper's own layer: only its parts take touches; the rest of the screen is the app's.
       child: Stack(
         children: [
+          if (runtime.outline != null && runtime.sheetShown) PickOutline(rect: runtime.outline!),
+          if (runtime.picking) PickCatcher(runtime: runtime),
           ViperSheet(runtime: runtime),
           if (!runtime.sheetOpen && !runtime.layout.hidden) ViperLauncher(runtime: runtime),
           if (runtime.picking) PickHandle(runtime: runtime),

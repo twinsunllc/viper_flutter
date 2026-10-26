@@ -16,6 +16,7 @@ import 'package:viper_flutter/src/core/device.dart';
 import 'package:viper_flutter/src/core/environment.dart';
 import 'package:viper_flutter/src/core/mask.dart';
 import 'package:viper_flutter/src/core/opener.dart';
+import 'package:viper_flutter/src/core/pick.dart';
 import 'package:viper_flutter/src/core/placement.dart';
 import 'package:viper_flutter/src/core/screens.dart';
 import 'package:viper_flutter/src/core/store.dart';
@@ -353,7 +354,8 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     );
     unawaited(panel!.load(bridgeUrl(panelUrl)));
     _setPhase(ViperPhase.ready);
-    _screen = screens.current(build: facts?.build);
+    _screen = screens.current(build: facts?.build, level: _level);
+    _watchScreens();
     if (_identity == null && identityCallback != null) unawaited(_fetchIdentity());
   }
 
@@ -490,7 +492,11 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
         _onReady();
       case 'viper:state':
         final state = message['state'];
-        if (state is Map<String, Object?>) _keepState(state);
+        if (state is Map<String, Object?>) {
+          _keepState(state);
+          // Out of the composer, the pick and its outline go (as the loader clears its pick).
+          if (state['view'] != 'compose' && !picking) _clearPick();
+        }
       case 'viper:viewer':
         staff = message['staff'] == true;
       case 'viper:theme':
@@ -525,8 +531,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
       case 'viper:pick:start':
         _startPick(message['mode'] is String ? message['mode'] as String : 'element');
       case 'viper:pick:step':
-        // Stepping up the pick's path comes with the element pick (slice 5).
-        break;
+        _stepPick(message['index'] is num ? (message['index']! as num).toInt() : -1);
       case 'viper:submit':
         await _submit(message);
       case 'viper:open':
@@ -570,7 +575,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     send({
       'type': 'viper:config',
       'config': config,
-      'screen': _screen ?? screens.current(build: facts?.build),
+      'screen': _screen ?? screens.current(build: facts?.build, level: _level),
       'state': panelState,
     });
     send({'type': 'viper:identity', 'identity': _identity});
@@ -639,20 +644,32 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   // -------------------------------------------------------------------------------------------
 
   void _startPick(String mode) {
+    _clearPick();
+    if (mode == 'surface') {
+      final popup = screens.topPopup();
+      final element = popup?.subtreeContext;
+      if (popup != null && element is Element && element.mounted) {
+        _pickSurface(popup, element);
+        return;
+      }
+      mode = 'screen';
+    }
     if (mode == 'screen') {
+      final surface = screens.currentSurface(level: _level);
       final context = <String, Object?>{
         'path': [
           {'label': 'Whole screen'},
         ],
         'index': 0,
         'mode': 'screen',
+        'surface': ?surface,
       };
       send({'type': 'viper:pick:none', 'scope': 'screen', 'label': 'Whole screen', 'context': context});
       unawaited(_shootForPick());
       return;
     }
-    // The element, box and dialog picks come in slice 5; until then the handle offers the whole
-    // screen, or going back.
+    // Element or box: the sheet shrinks to its handle and the next tap (or drag) picks (D169).
+    pickMode = mode == 'box' ? 'box' : 'element';
     picking = true;
     notifyListeners();
   }
@@ -665,6 +682,14 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     _startPick('screen');
   }
 
+  /// The handle's This dialog: the pick is the popup on top (W03).
+  void pickDialog() {
+    if (!picking) return;
+    picking = false;
+    notifyListeners();
+    _startPick('surface');
+  }
+
   /// The handle's Cancel, or Android's back while picking: back to the panel.
   void cancelPick() {
     if (!picking) return;
@@ -672,6 +697,134 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     picking = false;
     notifyListeners();
     send({'type': 'viper:pick:cancel'});
+  }
+
+  /// What was picked, and which step of its path is current (W17).
+  List<PickedStep> _pickPath = const [];
+  int _pickIndex = 0;
+  String _pickMode = 'element';
+  Map<String, Object?>? _pickBox;
+
+  /// Element or box, while picking.
+  String pickMode = 'element';
+
+  /// The outline on what was picked, while composing; never in a picture (Viper's layer is hidden).
+  Rect? outline;
+
+  void _clearPick() {
+    _pickPath = const [];
+    _pickBox = null;
+    if (outline != null) {
+      outline = null;
+      notifyListeners();
+    }
+  }
+
+  Element? get _appRoot {
+    final context = appKey.currentContext;
+    return context is Element && context.mounted ? context : null;
+  }
+
+  /// A tap while picking (W03): what's under it, and the path up from it.
+  void pickAt(Offset position) {
+    final root = _appRoot;
+    final hit = root == null ? null : elementAt(root, position);
+    if (hit == null) return;
+    picking = false;
+    _pickMode = 'element';
+    _pickPath = pathFor(hit, _level);
+    _pickIndex = _pickPath.length - 1;
+    _pickBox = null;
+    _sendPick();
+    unawaited(_shootForPick());
+  }
+
+  /// A drawn box while picking (D39): the widget at its middle names it, the box is the anchor's.
+  void pickBox(Rect rect) {
+    final root = _appRoot;
+    if (root == null || rect.width < 8 || rect.height < 8) return;
+    final hit = elementAt(root, rect.center);
+    if (hit == null) return;
+    picking = false;
+    _pickMode = 'box';
+    _pickPath = pathFor(hit, _level);
+    _pickIndex = _pickPath.length - 1;
+    _pickBox = {
+      'x': rect.left.round(),
+      'y': rect.top.round(),
+      'width': rect.width.round(),
+      'height': rect.height.round(),
+    };
+    _sendPick(drawn: rect);
+    unawaited(_shootForPick());
+  }
+
+  void _pickSurface(PopupRoute<dynamic> popup, Element element) {
+    final surface = surfaceOf(popup, level: _level);
+    final label = surface['name']! as String;
+    _pickMode = 'surface';
+    _pickPath = [PickedStep(element, label, element.widget.runtimeType.toString())];
+    _pickIndex = 0;
+    _pickBox = null;
+    _sendPick(surfaceLabel: label);
+    unawaited(_shootForPick());
+  }
+
+  void _sendPick({Rect? drawn, String? surfaceLabel}) {
+    if (_pickPath.isEmpty) return;
+    final step = _pickPath[_pickIndex];
+    final anchor = anchorFor(step.element, _level, box: _pickBox);
+    final shared = _pickMode == 'element' ? sharedPartOf(step.element) : null;
+    final surface = screens.currentSurface(level: _level);
+    final size = MediaQueryData.fromView(services.view()).size;
+    final rect = drawn ?? _rectOf(step.element);
+    final label = surfaceLabel ?? (_pickMode == 'box' ? 'Box around ${step.label}' : step.label);
+    final context = <String, Object?>{
+      'path': [
+        for (final s in _pickPath) {'label': s.label, if (staff) 'detail': _detail(s)},
+      ],
+      'index': _pickIndex,
+      'mode': _pickMode,
+      'shared_part': ?shared,
+      'surface': ?surface,
+      if (rect != null)
+        'view': {
+          'x': rect.left.round(),
+          'y': rect.top.round(),
+          'width': rect.width.round(),
+          'height': rect.height.round(),
+          'viewport_width': size.width.round(),
+          'viewport_height': size.height.round(),
+        },
+    };
+    outline = rect;
+    notifyListeners();
+    send({
+      'type': 'viper:pick:result',
+      'anchor': anchor,
+      'label': label,
+      'scope': _pickMode == 'surface' ? 'screen' : (shared != null ? 'shared_part' : 'element'),
+      'context': context,
+    });
+  }
+
+  /// What staff see beside a step (W03): the widget's type and its key.
+  static String _detail(PickedStep step) {
+    final key = step.element.widget.key;
+    return key is ValueKey ? '${step.widget} · ${key.value}' : step.widget;
+  }
+
+  Rect? _rectOf(Element element) {
+    final render = element.findRenderObject();
+    if (render is! RenderBox || !render.attached || !render.hasSize) return null;
+    return MatrixUtils.transformRect(render.getTransformTo(null), Offset.zero & render.size);
+  }
+
+  /// The breadcrumb's step (W17): up or down the path.
+  void _stepPick(int index) {
+    if (_pickPath.isEmpty || index < 0 || index >= _pickPath.length || _pickMode != 'element') return;
+    _pickIndex = index;
+    _sendPick();
   }
 
   /// The pick's picture, taken at once so the composer shows it (W21); the report uses it.
@@ -804,7 +957,10 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
         'files': reportFiles(console: activity.consoleEntries(_level), network: activity.networkEntries(_level)),
         'client_id': ?clientId,
       });
-      if (!silent) _forgetPickShot();
+      if (!silent) {
+        _forgetPickShot();
+        _clearPick();
+      }
     } catch (error) {
       send({
         'type': 'viper:save:failed',
@@ -837,7 +993,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
         context: mergeContext(_context, _safeContext() ?? const {}),
       ),
     );
-    final screen = screens.current(build: facts!.build);
+    final screen = screens.current(build: facts!.build, level: _level);
     return {
       ...report,
       'key': key,
@@ -896,14 +1052,40 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   @override
   void routesChanged(ViperNavigatorObserver observer) {
     // Read once the navigator has finished the change, never in the middle of it.
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (phase != ViperPhase.ready) return;
-      final next = screens.current(build: facts?.build);
-      if (_screen != null && next['route'] == _screen!['route']) return;
-      _screen = next;
-      send({'type': 'viper:navigate', 'screen': next});
-    });
+    SchedulerBinding.instance.addPostFrameCallback((_) => _lookAgain());
     SchedulerBinding.instance.ensureVisualUpdate();
+  }
+
+  /// Tells the panel when the screen changed (viper:navigate, so it records a visit) or only the
+  /// surface on it did (viper:surface): a dialog, a drawer, a tab.
+  void _lookAgain() {
+    if (phase != ViperPhase.ready || picking || capturing) return;
+    final next = screens.current(build: facts?.build, level: _level);
+    final previous = _screen;
+    _screen = next;
+    if (previous == null || next['route'] != previous['route']) {
+      send({'type': 'viper:navigate', 'screen': next});
+    } else if (jsonEncode(next['surface']) != jsonEncode(previous['surface'])) {
+      send({'type': 'viper:surface', 'surface': ?next['surface']});
+    }
+  }
+
+  bool _watching = false;
+  bool _disposed = false;
+  int _lastLook = -1000000;
+
+  /// Tabs and drawers change without a route, but never without a frame: after a frame, at most
+  /// once a second, Viper looks again. A still screen draws no frames and costs nothing.
+  void _watchScreens() {
+    if (_watching) return;
+    _watching = true;
+    SchedulerBinding.instance.addPersistentFrameCallback((timeStamp) {
+      if (_disposed || phase != ViperPhase.ready) return;
+      final now = timeStamp.inMilliseconds;
+      if (now - _lastLook < 1000) return;
+      _lastLook = now;
+      SchedulerBinding.instance.addPostFrameCallback((_) => _lookAgain());
+    });
   }
 
   // -------------------------------------------------------------------------------------------
@@ -946,6 +1128,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
 
   @override
   void dispose() {
+    _disposed = true;
     WidgetsBinding.instance.removeObserver(this);
     _retry?.cancel();
     _stateWrite?.cancel();

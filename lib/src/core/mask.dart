@@ -5,9 +5,11 @@
 //   Maximum:  all text and images except under ViperUnmask, every platform view.
 //
 // The boxes come from a walk of what is actually painted: a parent that doesn't paint a child
-// (Offstage, an IndexedStack's hidden tabs, Visibility) hides that child's whole subtree, and
-// each box goes through every transform to the screen. Logical pixels, filled natively before the
-// PNG is encoded.
+// (Offstage, an IndexedStack's hidden tabs, an Overlay's covered routes) hides that child's whole
+// subtree, each box goes through every transform to the screen, and each is cut to what its
+// ancestors' clips let show (a scrolled list's viewport, a ClipRRect), so a box never spills past
+// what's visible. Logical pixels, filled natively before the PNG is encoded.
+import 'package:flutter/material.dart' show Ink;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:viper_flutter/markers.dart';
@@ -32,6 +34,21 @@ enum PrivacyLevel {
   };
 }
 
+/// Widgets whose subtree is a web view, by type name for the ones from other packages (release
+/// builds keep widget type names, the spike found).
+const Set<String> webViewWidgetNames = {'WebViewWidget', 'InAppWebView', 'WebView', 'PlatformWebViewWidget'};
+
+/// Widgets that paint a picture without a RenderImage: SVGs, vector graphics.
+const Set<String> pictureWidgetNames = {'SvgPicture', 'VectorGraphic', 'Lottie', 'RiveAnimation'};
+
+/// Render objects that paint a picture, for packages Viper doesn't depend on.
+const Set<String> pictureRenderNames = {
+  'RenderVectorGraphic',
+  'RenderPictureProvider',
+  'RenderSvgPicture',
+  'RenderLottie',
+};
+
 /// The boxes to fill under [root] at [level], in the screen's logical pixels. [blockPlatformViews]
 /// fills every platform view whatever the level, for a picture Flutter drew itself, where they
 /// come out blank (D338).
@@ -39,19 +56,21 @@ List<Rect> maskBoxes(Element root, PrivacyLevel level, {bool blockPlatformViews 
   final private = <RenderObject>{};
   final unmasked = <RenderObject>{};
   final webViews = <RenderObject>{};
+  final pictures = <RenderObject>{};
   final theaters = <RenderObject>{};
   void mark(Element element) {
     final widget = element.widget;
-    if (widget is Overlay) {
-      final theater = _topRenderObject(element);
-      if (theater != null) theaters.add(theater);
-    }
+    final name = widget.runtimeType.toString();
     final set = widget is ViperPrivate
         ? private
         : widget is ViperUnmask
         ? unmasked
-        : widget is WebViewWidget
+        : widget is WebViewWidget || webViewWidgetNames.contains(name)
         ? webViews
+        : widget is Overlay
+        ? theaters
+        : pictureWidgetNames.contains(name) || (widget is Ink && _hasImage(widget.decoration))
+        ? pictures
         : null;
     if (set != null) {
       final top = _topRenderObject(element);
@@ -65,38 +84,49 @@ List<Rect> maskBoxes(Element root, PrivacyLevel level, {bool blockPlatformViews 
   if (start == null) return const [];
 
   final boxes = <Rect>[];
-  void add(RenderObject node) {
+  void add(RenderObject node, Rect clip) {
     if (node is! RenderBox || !node.hasSize || node.size.isEmpty) return;
-    final rect = MatrixUtils.transformRect(node.getTransformTo(null), Offset.zero & node.size);
-    if (!rect.isEmpty && rect.isFinite) boxes.add(rect);
+    final rect = MatrixUtils.transformRect(node.getTransformTo(null), Offset.zero & node.size).intersect(clip);
+    if (rect.width > 0 && rect.height > 0 && rect.isFinite) boxes.add(rect);
   }
 
-  void walk(RenderObject node, {required bool unmask}) {
+  void walk(RenderObject node, Rect clip, {required bool unmask}) {
+    // ViperPrivate is masked at every level, ViperUnmask or not; so is a web view.
     if (private.contains(node) || webViews.contains(node)) {
-      add(node);
+      add(node, clip);
       return;
     }
     final isUnmasked = unmask || unmasked.contains(node);
     if (_isPlatformView(node)) {
-      if (level != PrivacyLevel.standard || blockPlatformViews) add(node);
+      if (level != PrivacyLevel.standard || blockPlatformViews) add(node, clip);
       return;
     }
+    // Every field at Strict and above; an obscured one always. ViperUnmask is for text and
+    // images, never for what someone types.
     if (node is RenderEditable) {
-      if (node.obscureText || level != PrivacyLevel.standard) add(node);
+      if (node.obscureText || level != PrivacyLevel.standard) add(node, clip);
       return;
     }
-    if (_isImage(node) && (level == PrivacyLevel.strict || (level == PrivacyLevel.maximum && !isUnmasked))) {
-      add(node);
+    final image = pictures.contains(node) || _isImage(node);
+    if (image && (level == PrivacyLevel.strict || (level == PrivacyLevel.maximum && !isUnmasked))) {
+      add(node, clip);
       return;
     }
     if (node is RenderParagraph && level == PrivacyLevel.maximum && !isUnmasked) {
-      add(node);
+      add(node, clip);
       return;
     }
-    _paintedChildren(node, theaters, (child) => walk(child, unmask: isUnmasked));
+    _paintedChildren(node, theaters, (child) {
+      final local = node.describeApproximatePaintClip(child);
+      final inner = local == null ? clip : MatrixUtils.transformRect(node.getTransformTo(null), local).intersect(clip);
+      if (inner.width > 0 && inner.height > 0) walk(child, inner, unmask: isUnmasked);
+    });
   }
 
-  walk(start, unmask: false);
+  final screen = start is RenderBox && start.hasSize
+      ? MatrixUtils.transformRect(start.getTransformTo(null), Offset.zero & start.size)
+      : Rect.largest;
+  walk(start, screen, unmask: false);
   return boxes;
 }
 
@@ -119,13 +149,13 @@ RenderObject? _topRenderObject(Element element) {
 bool _isPlatformView(RenderObject node) =>
     node is PlatformViewRenderBox || node is RenderAndroidView || node is RenderUiKitView || node is RenderAppKitView;
 
+bool _hasImage(Decoration? decoration) => decoration is BoxDecoration && decoration.image != null;
+
+/// A picture: an image, an image decoration (an avatar's backgroundImage), an SVG.
 bool _isImage(RenderObject node) {
   if (node is RenderImage) return true;
-  if (node is RenderDecoratedBox) {
-    final decoration = node.decoration;
-    return decoration is BoxDecoration && decoration.image != null;
-  }
-  return false;
+  if (node is RenderDecoratedBox) return _hasImage(node.decoration);
+  return pictureRenderNames.contains(node.runtimeType.toString());
 }
 
 /// The children [node] paints, failing closed: every child unless the node says it doesn't paint

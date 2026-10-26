@@ -38,6 +38,17 @@ typedef PanelViewFactory =
       required Color background,
     });
 
+/// Keeps the panel at the phone's scale. WKWebView zooms into a focused field whose text is under
+/// 16 px, and stays zoomed, so the sheet showed a corner of the who-are-you form; a viewport that
+/// can't scale doesn't. Pinch zoom for accessibility is the phone's own and still works.
+const String noZoomScript = '''
+(function () {
+  var meta = document.querySelector('meta[name="viewport"]');
+  if (!meta) { meta = document.createElement('meta'); meta.name = 'viewport'; document.head.appendChild(meta); }
+  meta.content = 'width=device-width, initial-scale=1, maximum-scale=1';
+})();
+''';
+
 /// Whether a navigation may happen inside the web view: Viper's own pages, and frames that hold
 /// no page of their own.
 bool panelMayNavigate(Uri url, Uri base, {required bool mainFrame}) {
@@ -79,6 +90,7 @@ class WebPanelView implements PanelView {
             }
             return NavigationDecision.prevent;
           },
+          onPageFinished: (_) => unawaited(_controller.runJavaScript(noZoomScript).catchError((Object _) {})),
           onWebResourceError: (error) {
             if (error.isForMainFrame ?? false) onLoadError(error.description);
           },

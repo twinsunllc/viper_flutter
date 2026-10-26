@@ -117,7 +117,7 @@ List<Rect> maskBoxes(Element root, PrivacyLevel level, {bool blockPlatformViews 
       return;
     }
     _paintedChildren(node, theaters, (child) {
-      final local = node.describeApproximatePaintClip(child);
+      final local = _clipFor(node, child);
       final inner = local == null ? clip : MatrixUtils.transformRect(node.getTransformTo(null), local).intersect(clip);
       if (inner.width > 0 && inner.height > 0) walk(child, inner, unmask: isUnmasked);
     });
@@ -175,3 +175,32 @@ void _paintedChildren(RenderObject node, Set<RenderObject> theaters, void Functi
     node.visitChildren(each);
   }
 }
+
+/// What [node] clips [child] to, in [node]'s coordinates. A viewport's own approximation leaves
+/// out the part under a pinned header, which only paints over what scrolled beneath it: a
+/// translucent header lets that show, so the whole viewport counts (failing closed).
+Rect? _clipFor(RenderObject node, RenderObject child) {
+  if (node is RenderViewportBase) return node.clipBehavior == Clip.none ? null : Offset.zero & node.size;
+  return node.describeApproximatePaintClip(child);
+}
+
+/// Whether [node] is painted: every ancestor paints the child it came through, and none is an
+/// IndexedStack showing another tab or an Overlay ([theaters]) covering its route.
+bool isPainted(RenderObject node, Set<RenderObject> theaters) {
+  var child = node;
+  var parent = child.parent;
+  while (parent != null) {
+    if (!parent.paintsChild(child)) return false;
+    if (parent is RenderIndexedStack || theaters.contains(parent)) {
+      var shown = false;
+      parent.visitChildrenForSemantics((visible) => shown = shown || identical(visible, child));
+      if (!shown) return false;
+    }
+    child = parent;
+    parent = child.parent;
+  }
+  return true;
+}
+
+/// The render object an Overlay paints its routes through, for [isPainted].
+RenderObject? overlayTheater(Element overlay) => _topRenderObject(overlay);

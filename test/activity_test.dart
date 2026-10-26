@@ -202,12 +202,33 @@ void main() {
 
   group('certificate pinning through the wrapper (D333)', () {
     late HttpServer server;
-    final pem = File('test/support/certs/localhost.pem').readAsStringSync();
+    late String pem;
 
-    setUp(() async {
+    // A throwaway self-signed certificate, made for the run: the repo keeps no key material.
+    setUpAll(() async {
+      final dir = await Directory.systemTemp.createTemp('viper-pinning');
+      final made = await Process.run('openssl', [
+        'req',
+        '-x509',
+        '-newkey',
+        'rsa:2048',
+        '-nodes',
+        '-days',
+        '1',
+        '-subj',
+        '/CN=localhost',
+        '-addext',
+        'subjectAltName=IP:127.0.0.1,DNS:localhost',
+        '-keyout',
+        '${dir.path}/localhost.key',
+        '-out',
+        '${dir.path}/localhost.pem',
+      ]);
+      expect(made.exitCode, 0, reason: '${made.stderr}');
+      pem = File('${dir.path}/localhost.pem').readAsStringSync();
       final context = SecurityContext()
-        ..useCertificateChain('test/support/certs/localhost.pem')
-        ..usePrivateKey('test/support/certs/localhost.key');
+        ..useCertificateChain('${dir.path}/localhost.pem')
+        ..usePrivateKey('${dir.path}/localhost.key');
       server = await HttpServer.bindSecure(InternetAddress.loopbackIPv4, 0, context);
       server.listen((request) async {
         request.response.statusCode = 200;
@@ -215,7 +236,7 @@ void main() {
       });
     });
 
-    tearDown(() => server.close(force: true));
+    tearDownAll(() => server.close(force: true));
 
     /// The app's pinning, installed after Viper's and chained to it, as Set&Co's is: it trusts no
     /// roots and accepts only the pinned certificate.

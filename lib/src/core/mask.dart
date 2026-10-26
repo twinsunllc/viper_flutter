@@ -39,8 +39,13 @@ List<Rect> maskBoxes(Element root, PrivacyLevel level, {bool blockPlatformViews 
   final private = <RenderObject>{};
   final unmasked = <RenderObject>{};
   final webViews = <RenderObject>{};
+  final theaters = <RenderObject>{};
   void mark(Element element) {
     final widget = element.widget;
+    if (widget is Overlay) {
+      final theater = _topRenderObject(element);
+      if (theater != null) theaters.add(theater);
+    }
     final set = widget is ViperPrivate
         ? private
         : widget is ViperUnmask
@@ -88,7 +93,7 @@ List<Rect> maskBoxes(Element root, PrivacyLevel level, {bool blockPlatformViews 
       add(node);
       return;
     }
-    _paintedChildren(node, (child) => walk(child, unmask: isUnmasked));
+    _paintedChildren(node, theaters, (child) => walk(child, unmask: isUnmasked));
   }
 
   walk(start, unmask: false);
@@ -123,18 +128,20 @@ bool _isImage(RenderObject node) {
   return false;
 }
 
-/// The children [node] paints. `paintsChild` answers for Offstage and Opacity, but an
-/// IndexedStack's hidden tabs and an Overlay's covered routes are only left out of what a node
-/// visits for semantics, so that list is the one to walk, except where a node drops children
-/// from semantics while still painting them (ExcludeSemantics, IgnorePointer, AbsorbPointer).
-void _paintedChildren(RenderObject node, void Function(RenderObject child) visit) {
+/// The children [node] paints, failing closed: every child unless the node says it doesn't paint
+/// it (`paintsChild`: Offstage, Opacity 0), and only two kinds narrowed further, whose hidden
+/// children `paintsChild` doesn't report: an IndexedStack's other tabs, and the routes an Overlay
+/// covers. Both visit only what they show for semantics. Anything else that leaves children out of
+/// semantics (ExcludeSemantics, `Semantics(excludeSemantics: true)`) still paints them, so they
+/// are walked.
+void _paintedChildren(RenderObject node, Set<RenderObject> theaters, void Function(RenderObject child) visit) {
   void each(RenderObject child) {
     if (node.paintsChild(child)) visit(child);
   }
 
-  if (node is RenderExcludeSemantics || node is RenderIgnorePointer || node is RenderAbsorbPointer) {
-    node.visitChildren(each);
-  } else {
+  if (node is RenderIndexedStack || theaters.contains(node)) {
     node.visitChildrenForSemantics(each);
+  } else {
+    node.visitChildren(each);
   }
 }

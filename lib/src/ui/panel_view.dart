@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:viper_flutter/src/core/camera.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
@@ -87,7 +88,18 @@ class WebPanelView implements PanelView {
     );
     final platform = _controller.platform;
     if (platform is WebKitWebViewController) unawaited(platform.setInspectable(kDebugMode));
-    if (platform is AndroidWebViewController) unawaited(AndroidWebViewController.enableDebugging(kDebugMode));
+    if (platform is AndroidWebViewController) {
+      unawaited(AndroidWebViewController.enableDebugging(kDebugMode));
+      // The panel's file inputs (D235): Android's web view shows no picker on its own.
+      unawaited(
+        platform.setOnShowFileSelector(
+          (params) => const ChannelNative().pickFiles(
+            params.acceptTypes,
+            multiple: params.mode == FileSelectorMode.openMultiple,
+          ),
+        ),
+      );
+    }
   }
 
   /// Viper's base URL.

@@ -3,6 +3,7 @@
 // the panel what it needs to know about the app.
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
@@ -19,6 +20,7 @@ import 'package:viper_flutter/src/core/opener.dart';
 import 'package:viper_flutter/src/core/pick.dart';
 import 'package:viper_flutter/src/core/placement.dart';
 import 'package:viper_flutter/src/core/screens.dart';
+import 'package:viper_flutter/src/core/shots.dart';
 import 'package:viper_flutter/src/core/store.dart';
 import 'package:viper_flutter/src/slots.dart';
 import 'package:viper_flutter/src/ui/host.dart';
@@ -65,7 +67,9 @@ class ViperServices {
     ui.FlutterView Function()? view,
     String Function(DateTime now)? timezone,
     ViperNative? native,
-  }) : device = device ?? PluginDevice(),
+    ShotStore? shots,
+  }) : shots = shots ?? FileShotStore(Directory('${Directory.systemTemp.path}/viper')),
+       device = device ?? PluginDevice(),
        native = native ?? const ChannelNative(),
        store = store ?? PreferencesStore(),
        panelView = panelView ?? webPanelView,
@@ -104,6 +108,9 @@ class ViperServices {
   final ui.FlutterView Function() view;
 
   final String Function(DateTime now)? _timezone;
+
+  /// Unsent reports' pictures, kept on the phone (D165).
+  final ShotStore shots;
 
   /// The plugin's native calls: the screenshot and the time zone (D338).
   final ViperNative native;
@@ -280,6 +287,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
       return;
     }
     unawaited(services.native.timezone().then((zone) => services.nativeTimezone = zone));
+    unawaited(services.shots.prune(services.clock()).catchError((Object _) {}));
     theme = await services.store.read(_themeKey) ?? 'system';
     final kept = await services.store.readJson(_stateKey);
     if (kept != null) panelState = kept;
@@ -290,8 +298,10 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   void _takePending() {
     if (ViperSlots.identityPending) {
       _identity = ViperSlots.pendingIdentity;
+      _refresh = ViperSlots.pendingRefresh;
       ViperSlots.identityPending = false;
       ViperSlots.pendingIdentity = null;
+      ViperSlots.pendingRefresh = null;
     }
     _context = mergeContext(_context, ViperSlots.pendingContext);
     ViperSlots.pendingContext.clear();
@@ -356,7 +366,26 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     _setPhase(ViperPhase.ready);
     _screen = screens.current(build: facts?.build, level: _level);
     _watchScreens();
+    unawaited(_listenForShake());
     if (_identity == null && identityCallback != null) unawaited(_fetchIdentity());
+  }
+
+  /// A shake opens Viper, hidden or not (D335), where the project has shake on.
+  Future<void> _listenForShake() async {
+    if (!_shakeOn) return;
+    shakeAvailable = await services.native.startShake(onShake);
+    if (!shakeAvailable) return;
+    // The panel heard "no shake" if it was ready first: tell it again.
+    if (_sentShake == false) send(bridgeMessage());
+    notifyListeners();
+  }
+
+  /// The phone was shaken: Viper shows again if it was hidden, and opens.
+  void onShake() {
+    if (phase != ViperPhase.ready) return;
+    if (layout.hidden) setHidden(false);
+    if (picking) return;
+    openSheet();
   }
 
   /// The panel's URL in bridge mode (flutter.md, the bridge).
@@ -548,8 +577,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
       case 'viper:auth:done':
         await services.opener.closeAuth();
       case 'viper:highlight':
-        // Outlining an item's widget comes with the pick (slice 6).
-        break;
+        _highlight(message['anchor']);
       case 'viper:exact:request':
         send({'type': 'viper:exact:status', 'granted': false, 'reason': 'unsupported'});
       default:
@@ -584,9 +612,12 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     notifyListeners();
   }
 
+  bool? _sentShake;
+
   /// viper:bridge: what the panel needs to know about the app (flutter.md).
   Map<String, Object?> bridgeMessage() {
     final view = services.view();
+    if (panelReady) _sentShake = shakeAvailable && _shakeOn;
     return {
       'type': 'viper:bridge',
       'platform': 'flutter',
@@ -633,6 +664,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     refusal = reason;
     sheetOpen = false;
     _retry?.cancel();
+    unawaited(services.native.stopShake());
     phase = ViperPhase.off;
     onStop?.call();
     notifyListeners();
@@ -822,6 +854,19 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     return MatrixUtils.transformRect(render.getTransformTo(null), Offset.zero & render.size);
   }
 
+  /// Where to look while checking a fix (W07): the item's widget outlined, when it's on screen and
+  /// nothing is being picked; no anchor takes the outline away.
+  void _highlight(Object? anchor) {
+    if (_pickPath.isNotEmpty || picking) return;
+    final locators = anchor is Map ? anchor['locators'] : null;
+    final root = _appRoot;
+    final found = root == null || locators is! Map<String, Object?> ? null : findAnchor(root, locators);
+    final rect = found == null ? null : _rectOf(found);
+    if (rect == outline) return;
+    outline = rect;
+    notifyListeners();
+  }
+
   /// The breadcrumb's step (W17): up or down the path.
   void _stepPick(int index) {
     if (_pickPath.isEmpty || index < 0 || index >= _pickPath.length || _pickMode != 'element') return;
@@ -918,7 +963,9 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     final silent = report['moment'] is String && report['moment'] != 'reported';
     var attempt = clientId == null ? null : _tries[clientId];
     if (attempt == null) {
-      attempt = _Attempt(silent ? null : (_pickShot ?? await _pickShotTaking));
+      // A send the panel kept across a restart brings back the picture it was taken with.
+      final kept = clientId == null ? null : await services.shots.load(clientId);
+      attempt = _Attempt(kept ?? (silent ? null : (_pickShot ?? await _pickShotTaking)));
       if (clientId != null) {
         _tries[clientId] = attempt;
         // A send the panel gave up on never comes back: keep only the last few pictures.
@@ -940,6 +987,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
             attempt.refused = true;
           case PictureUnreachable(:final message):
             services.log('the picture could not be sent ($message); the panel will try again');
+            if (clientId != null) unawaited(services.shots.save(clientId, shot).catchError((Object _) {}));
             send({
               'type': 'viper:save:failed',
               'message': "Viper couldn't be reached.",
@@ -952,7 +1000,10 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
       final info = attempt.refused ? const ScreenshotInfo.none(blocked: 'failed') : shot.info;
       final payload = await reportPayload(report, screenshot: info);
       if (attempt.pictureId != null && !attempt.refused) payload['device_picture'] = attempt.pictureId;
-      if (clientId != null) _tries.remove(clientId);
+      if (clientId != null) {
+        _tries.remove(clientId);
+        unawaited(services.shots.drop(clientId).catchError((Object _) {}));
+      }
       send({
         'type': 'viper:report',
         'payload': payload,
@@ -1043,7 +1094,33 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   @override
   void identify(SignedIdentity? identity, {IdentityRefresh? refresh}) {
     _identity = identity;
+    _refresh = refresh ?? _refresh ?? identityCallback;
+    _scheduleRefresh();
     send({'type': 'viper:identity', 'identity': identity});
+  }
+
+  IdentityRefresh? _refresh;
+  Timer? _refreshTimer;
+
+  /// A signature expires (D86): a minute before it does, the app's refresh callback is asked for
+  /// a fresh one, as the web's page API does.
+  void _scheduleRefresh() {
+    _refreshTimer?.cancel();
+    final refresh = _refresh;
+    final payload = _identity?['payload'];
+    final exp = payload is Map && payload['exp'] is num ? (payload['exp']! as num).toInt() : null;
+    if (refresh == null || exp == null) return;
+    final due = DateTime.fromMillisecondsSinceEpoch(
+      exp * 1000,
+    ).subtract(const Duration(minutes: 1)).difference(services.clock());
+    _refreshTimer = Timer(due.isNegative ? Duration.zero : due, () async {
+      try {
+        final fresh = await refresh();
+        if (!_disposed) identify(fresh, refresh: refresh);
+      } catch (error) {
+        services.log('the identity refresh failed ($error)');
+      }
+    });
   }
 
   @override
@@ -1131,6 +1208,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   @override
   void dispose() {
     _disposed = true;
+    _refreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _retry?.cancel();
     _stateWrite?.cancel();

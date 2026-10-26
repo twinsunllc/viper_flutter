@@ -332,3 +332,34 @@ Map<String, Object?>? sharedPartOf(Element element) {
   }
   return part;
 }
+
+/// The widget an item's anchor points at, when it's on screen now (W07): by its key and type
+/// first, then by its type and words. Null when it can't be found.
+Element? findAnchor(Element root, Map<String, Object?>? locators) {
+  if (locators == null) return null;
+  final type = locators['widget'];
+  final key = locators['key'];
+  final text = locators['text'];
+  if (type is! String) return null;
+  Element? byKey;
+  Element? byText;
+  void visit(Element element) {
+    if (byKey != null) return;
+    final widget = element.widget;
+    if (widget.runtimeType.toString() == type) {
+      final own = widget.key;
+      if (key is String && own is ValueKey && '${own.value}' == key) {
+        byKey = element;
+        return;
+      }
+      if (byText == null && key == null && text is String && textOf(element, PrivacyLevel.standard) == text) {
+        byText = element;
+      }
+    }
+    element.visitChildElements(visit);
+  }
+
+  visit(root);
+  final found = byKey ?? byText;
+  return found != null && onScreen(found) ? found : null;
+}

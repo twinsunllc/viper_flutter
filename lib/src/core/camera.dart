@@ -81,6 +81,13 @@ abstract interface class ViperNative {
 
   /// The phone's time zone, `America/Chicago`, or null.
   Future<String?> timezone();
+
+  /// Starts listening for a shake (D335), calling [onShake] each time; false where the phone
+  /// can't tell.
+  Future<bool> startShake(void Function() onShake);
+
+  /// Stops listening.
+  Future<void> stopShake();
 }
 
 /// [ViperNative] over the `viper_flutter` channel.
@@ -113,6 +120,45 @@ class ChannelNative implements ViperNative {
       return NativeFailed('${error.code}: ${error.message}');
     } on MissingPluginException catch (error) {
       return NativeFailed('$error');
+    }
+  }
+
+  @override
+  Future<bool> startShake(void Function() onShake) async {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'shake') onShake();
+      return null;
+    });
+    try {
+      return await _channel.invokeMethod<bool>('startShake') ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  /// Android's system file picker for the panel's file inputs (D235): the chosen files' content
+  /// URIs, empty when the person backs out.
+  Future<List<String>> pickFiles(List<String> accept, {bool multiple = false}) async {
+    try {
+      final picked = await _channel.invokeListMethod<String>('pickFiles', {'accept': accept, 'multiple': multiple});
+      return picked ?? const [];
+    } on PlatformException {
+      return const [];
+    } on MissingPluginException {
+      return const [];
+    }
+  }
+
+  @override
+  Future<void> stopShake() async {
+    try {
+      await _channel.invokeMethod<void>('stopShake');
+    } on PlatformException {
+      return;
+    } on MissingPluginException {
+      return;
     }
   }
 

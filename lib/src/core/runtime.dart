@@ -654,6 +654,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   /// The handle's Cancel, or Android's back while picking: back to the panel.
   void cancelPick() {
     if (!picking) return;
+    _forgetPickShot();
     picking = false;
     notifyListeners();
     send({'type': 'viper:pick:cancel'});
@@ -678,19 +679,29 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
 
   /// The masked picture of the app (D330, D331, D338): Viper's own UI hidden for the frame, the
   /// native picture first, Flutter's toImage when that fails, none on a secure window.
-  Future<Shot> takeShot() async {
-    final root = appKey.currentContext as Element?;
+  Future<Shot> takeShot() {
+    // One shot at a time: a second caller (a silent capture during a pick's shot) gets the one
+    // under way, so Viper's layer never comes back in the middle of a shot.
+    return _shooting ??= _shoot().whenComplete(() => _shooting = null);
+  }
+
+  Future<Shot>? _shooting;
+
+  Future<Shot> _shoot() async {
     final level = PrivacyLevel.parse((config?['project'] as Map?)?['privacy_level']);
-    if (root == null) return const Shot.none(ScreenshotInfo.none(blocked: 'failed'));
+    if (appKey.currentContext == null) return const Shot.none(ScreenshotInfo.none(blocked: 'failed'));
     final watch = Stopwatch()..start();
-    final boxes = maskBoxes(root, level);
     capturing = true;
     notifyListeners();
     try {
       // The frame without Viper on it has to reach the screen before the native side draws it.
       await SchedulerBinding.instance.endOfFrame;
       await SchedulerBinding.instance.endOfFrame;
-      final answer = await services.native.capture(boxes);
+      final root = appKey.currentContext as Element?;
+      if (root == null) return const Shot.none(ScreenshotInfo.none(blocked: 'failed'));
+      // The boxes from the frame the native side copies, so a scroll or an animation can't move a
+      // field out from under its box.
+      final answer = await services.native.capture(maskBoxes(root, level));
       switch (answer) {
         case NativePicture(:final png, :final thumb):
           return Shot(
@@ -723,6 +734,12 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     }
   }
 
+  /// Forgets the pick's picture: sent, cancelled, or replaced by a new pick.
+  void _forgetPickShot() {
+    _pickShot = null;
+    _pickShotTaking = null;
+  }
+
   Future<void> _submit(Map<String, Object?> message) async {
     final report = message['report'];
     final clientId = message['client_id'] is String ? message['client_id'] as String : null;
@@ -733,7 +750,13 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     var attempt = clientId == null ? null : _tries[clientId];
     if (attempt == null) {
       attempt = _Attempt(silent ? null : (_pickShot ?? await _pickShotTaking));
-      if (clientId != null) _tries[clientId] = attempt;
+      if (clientId != null) {
+        _tries[clientId] = attempt;
+        // A send the panel gave up on never comes back: keep only the last few pictures.
+        while (_tries.length > 3) {
+          _tries.remove(_tries.keys.first);
+        }
+      }
     }
     try {
       final shot = attempt.shot ??= await takeShot();
@@ -767,7 +790,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
         'files': reportFiles(console: const [], network: const []),
         'client_id': ?clientId,
       });
-      if (!silent) _pickShot = null;
+      if (!silent) _forgetPickShot();
     } catch (error) {
       send({
         'type': 'viper:save:failed',

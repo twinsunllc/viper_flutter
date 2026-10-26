@@ -125,6 +125,8 @@ class ChannelNative implements ViperNative {
 
   @override
   Future<bool> startShake(void Function() onShake) async {
+    // The channel has one handler for every native-to-Dart call, and shake is the only one today.
+    // A second call belongs in this same handler, not a new setMethodCallHandler that replaces it.
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'shake') onShake();
       return null;

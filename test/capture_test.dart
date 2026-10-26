@@ -167,6 +167,56 @@ void main() {
     expect(h.native.captures.last, isEmpty);
   });
 
+  testWidgets('a field under Semantics(excludeSemantics: true) is still painted, so still masked', (tester) async {
+    final (h, runtime) = await pumpApp(
+      tester,
+      home: Scaffold(
+        body: Semantics(
+          label: 'Sign in',
+          excludeSemantics: true,
+          child: const ExcludeSemantics(child: TextField(key: ValueKey('hidden-password'), obscureText: true)),
+        ),
+      ),
+    );
+    h.panel!.post({'type': 'viper:pick:start', 'mode': 'screen'});
+    await settle(tester);
+    final field = find.descendant(
+      of: find.byKey(const ValueKey('hidden-password')),
+      matching: find.byType(EditableText),
+    );
+    expect(h.native.captures.last.any((box) => box.overlaps(tester.getRect(field).deflate(1))), isTrue);
+  });
+
+  testWidgets('two shots at once are one: Viper stays hidden until it is taken', (tester) async {
+    final (h, runtime) = await pumpApp(tester);
+    final first = runtime.takeShot();
+    final second = runtime.takeShot();
+    expect(identical(first, second), isTrue);
+    await settle(tester);
+    expect(h.native.captures, hasLength(1));
+    expect(runtime.capturing, isFalse);
+  });
+
+  testWidgets("a report after a cancelled pick never reuses an earlier report's picture", (tester) async {
+    final (h, runtime) = await pumpApp(tester);
+    h.panel!.post({'type': 'viper:pick:start', 'mode': 'screen'});
+    await settle(tester);
+    h.panel!.post({
+      'type': 'viper:submit',
+      'client_id': 'first',
+      'report': {'scope': 'screen', 'body': 'First'},
+    });
+    await settle(tester);
+    expect(h.native.captures, hasLength(1));
+    h.panel!.post({
+      'type': 'viper:submit',
+      'client_id': 'second',
+      'report': {'scope': 'screen', 'body': 'Second, with no pick of its own'},
+    });
+    await settle(tester);
+    expect(h.native.captures, hasLength(2), reason: 'a fresh picture of the screen as it is now');
+  });
+
   testWidgets('a secure window gets no picture, on purpose, and the report says why (D338)', (tester) async {
     final (h, runtime) = await pumpApp(tester);
     h.native.answer = const NativeSecure();

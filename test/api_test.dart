@@ -114,5 +114,12 @@ void main() {
     expect(await api().uploadPicture([1]), isA<PictureRefused>().having((o) => o.reason, 'reason', 'too_many'));
     answer = (response) => response.statusCode = 502;
     expect(await api().uploadPicture([1]), isA<PictureUnreachable>());
+    answer = (response) => response.statusCode = 429;
+    expect(await api().uploadPicture([1]), isA<PictureUnreachable>());
+    // An unreadable 413 from a proxy won't work next time: the report goes without the picture.
+    answer = (response) => response
+      ..statusCode = 413
+      ..write('<html>Too large</html>');
+    expect(await api().uploadPicture([1]), isA<PictureRefused>().having((o) => o.reason, 'reason', 'http_413'));
   });
 }

@@ -117,7 +117,7 @@ Map<String, String> viperHeaders({required String key, required String appId}) =
 class HttpViperApi implements ViperApi {
   /// Calls [host] with [key] for the app [appId].
   HttpViperApi({required this.host, required this.key, required this.appId, HttpClient? client})
-    : _client = client ?? HttpClient();
+    : _client = client ?? HttpOverrides.runWithHttpOverrides(HttpClient.new, _ViperOwnClient());
 
   /// Viper's base URL.
   final Uri host;
@@ -214,3 +214,7 @@ class HttpViperApi implements ViperApi {
   @override
   void close() => _client.close(force: true);
 }
+
+/// Viper's own client is made outside the app's overrides, so its calls never reach the app's
+/// network log (D109) and the app's pinning never applies to Viper's host.
+class _ViperOwnClient extends HttpOverrides {}

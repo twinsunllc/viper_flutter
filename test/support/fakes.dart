@@ -1,4 +1,5 @@
 // Stand-ins for what the runtime reaches outside itself, and the fixture writer (D340).
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -78,9 +79,13 @@ class FakeApi implements ViperApi {
   /// How many times config was asked.
   int calls = 0;
 
+  /// When set, config waits for it before answering.
+  Completer<void>? gate;
+
   @override
   Future<ConfigOutcome> config() async {
     calls++;
+    await gate?.future;
     return outcome;
   }
 
@@ -203,6 +208,9 @@ class Harness {
   /// The panel, once made.
   FakePanelView? panel;
 
+  /// How many panels were made.
+  int panelsMade = 0;
+
   /// A fixed now: Monday, October 26, 2026, 9:00 a.m. HST.
   static final DateTime now = DateTime.utc(2026, 10, 26, 19);
 
@@ -220,9 +228,10 @@ class Harness {
       log: log.add,
       view: () => view,
       timezone: (_) => 'Pacific/Honolulu',
-      panelView:
-          ({required base, required onMessage, required onExternal, required onLoadError, required background}) =>
-              panel = FakePanelView(base, onMessage),
+      panelView: ({required base, required onMessage, required onExternal, required onLoadError, required background}) {
+        panelsMade++;
+        return panel = FakePanelView(base, onMessage);
+      },
     ),
   );
 }

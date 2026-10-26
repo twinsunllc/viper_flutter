@@ -1,4 +1,6 @@
 // Viper's start and the bridge's message table (flutter.md), from Dart's side.
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:viper_flutter/src/core/api.dart';
@@ -84,6 +86,24 @@ void main() {
       await tester.pump();
       expect(runtime.phase, ViperPhase.ready);
       expect(h.api.calls, 2);
+    });
+
+    testWidgets('a resume while a config call is out never makes a second panel', (tester) async {
+      final (h, runtime) = await started(
+        tester,
+        harness: Harness(view: tester.view, outcome: const ConfigUnreachable('offline')),
+      );
+      h.api
+        ..outcome = ConfigOk(exampleConfig())
+        ..gate = Completer<void>();
+      runtime.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      runtime.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await tester.pump(const Duration(seconds: 6));
+      expect(h.api.calls, 2, reason: 'one call out at a time, the retry timer included');
+      h.api.gate!.complete();
+      await tester.pump();
+      expect(runtime.phase, ViperPhase.ready);
+      expect(h.panelsMade, 1);
     });
 
     testWidgets('loads the panel in bridge mode once, hidden, at the config ok', (tester) async {

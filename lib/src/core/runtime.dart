@@ -152,6 +152,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   String? refusal;
 
   ViperApi? _api;
+  bool _asking = false;
   Timer? _retry;
   int _attempts = 0;
 
@@ -246,9 +247,18 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   }
 
   Future<void> _askConfig() async {
-    if (phase == ViperPhase.off || phase == ViperPhase.ready) return;
+    // One call at a time: a resume while the retry's call is still out waits for its answer, so
+    // two answers can never make two panels.
+    if (phase == ViperPhase.off || phase == ViperPhase.ready || _asking) return;
+    _asking = true;
     _attempts++;
-    final outcome = await _api!.config();
+    final ConfigOutcome outcome;
+    try {
+      outcome = await _api!.config();
+    } finally {
+      _asking = false;
+    }
+    if (phase == ViperPhase.off || phase == ViperPhase.ready) return;
     switch (outcome) {
       case ConfigOk(:final config):
         await _start(config);
@@ -271,6 +281,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   }
 
   Future<void> _start(Map<String, Object?> ok) async {
+    if (panel != null) return;
     config = ok;
     project = ProjectPlacement.fromJson(ok['launcher']);
     layout = LauncherLayout.restore(await services.store.readJson(_launcherKey), project);

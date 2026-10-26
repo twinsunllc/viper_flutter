@@ -5,5 +5,5 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 flutter test
-flutter test --dart-define=VIPER=true test/markers_test.dart
+flutter test --dart-define=VIPER=true test/markers_test.dart test/zone_test.dart
 (cd example && flutter test)

@@ -30,6 +30,10 @@ abstract final class Viper {
   static final ActivityLog _activity = ActivityLog();
   static final ConsoleCapture _console = ConsoleCapture(_activity);
 
+  /// The console and network log, for tests.
+  @visibleForTesting
+  static ActivityLog get activity => _activity;
+
   /// The running Viper, once started.
   static ViperRuntime? get runtime => _runtime;
 

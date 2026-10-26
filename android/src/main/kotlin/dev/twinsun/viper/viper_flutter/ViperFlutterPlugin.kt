@@ -71,6 +71,10 @@ class ViperFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activ
   }
 
   override fun onDetachedFromActivity() {
+    // The activity is gone for good: a picker it opened will never answer, so answer it empty and
+    // let the next pick open one.
+    picking?.success(emptyList<String>())
+    picking = null
     detach()
   }
 

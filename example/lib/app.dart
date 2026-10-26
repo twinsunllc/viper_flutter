@@ -3,6 +3,7 @@
 // IndexedStack (one with its own navigator), an image, a web view and a native platform view.
 // Shared code like this imports only markers.dart (D336).
 import 'package:flutter/material.dart';
+import 'package:logging/logging.dart';
 import 'package:viper_flutter/markers.dart';
 import 'package:viper_flutter_example/screens/account.dart';
 import 'package:viper_flutter_example/screens/crew.dart';
@@ -14,6 +15,9 @@ import 'package:viper_flutter_example/screens/web_page.dart';
 /// own setup and before it builds its HTTP clients.
 void main({void Function()? onBoot}) {
   WidgetsFlutterBinding.ensureInitialized();
+  // The app's own logging, as most apps set it up; Viper hears it without changing the level.
+  Logger.root.level = Level.INFO;
+  Logger.root.onRecord.listen((record) => debugPrint('${record.level.name}: ${record.loggerName}: ${record.message}'));
   onBoot?.call();
   runApp(const ExampleApp());
 }

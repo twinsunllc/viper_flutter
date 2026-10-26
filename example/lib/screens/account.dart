@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:logging/logging.dart';
 
 /// The tab.
 class AccountTab extends StatefulWidget {
@@ -21,6 +22,28 @@ class _AccountTabState extends State<AccountTab> {
   bool _secure = false;
 
   static const _secureChannel = MethodChannel('example/secure');
+
+  static final _log = Logger('Account');
+
+  /// What a real Save would do, so a report has console lines and a network call in it (D333):
+  /// a print, a warning through package:logging, and a call to the app's "API" (a path the local
+  /// Viper doesn't have, so it answers 404 with a request id).
+  Future<void> _save() async {
+    // ignore: avoid_print
+    print('Saving the profile for ${_name.text}');
+    final client = HttpClient();
+    try {
+      final request = await client.putUrl(Uri.parse('http://localhost:4830/api/profile?user=7'));
+      final response = await request.close();
+      await response.drain<void>();
+      if (response.statusCode >= 400) _log.warning('Profile save failed: the server answered ${response.statusCode}');
+    } on IOException catch (error) {
+      _log.warning('Profile save failed: $error');
+    } finally {
+      client.close();
+    }
+    if (mounted) setState(() => _saved = true);
+  }
 
   @override
   void dispose() {
@@ -56,7 +79,7 @@ class _AccountTabState extends State<AccountTab> {
         const SizedBox(height: 20),
         ElevatedButton(
           key: const ValueKey('save'),
-          onPressed: () => setState(() => _saved = true),
+          onPressed: _save,
           child: const Text('Save'),
         ),
         if (_saved) const Padding(padding: EdgeInsets.only(top: 12), child: Text('Saved.')),

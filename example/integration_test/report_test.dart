@@ -125,6 +125,10 @@ void main() {
     // the tab bar on its own (D351), so the tab is there to tap.
     await tester.tap(find.text('Account'));
     await tester.pump(const Duration(milliseconds: 500));
+    // Save prints, warns through package:logging and calls the app's API, so the report has
+    // console lines and a network call (D333).
+    await tester.tap(find.byKey(const ValueKey('save')));
+    await pumpUntil(tester, () async => find.text('Saved.').evaluate().isNotEmpty);
     await reportWholeScreen(tester, runtime, 'The Save button stays grey (integration $stamp)');
 
     // A native platform view, which the native picture draws (D338).

@@ -1,5 +1,8 @@
 // The Account tab: a form with a password field, which Standard masks (D331).
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// The tab.
 class AccountTab extends StatefulWidget {
@@ -15,6 +18,9 @@ class _AccountTabState extends State<AccountTab> {
   final _email = TextEditingController(text: 'kalani@example.com');
   final _password = TextEditingController(text: 'correct horse');
   bool _saved = false;
+  bool _secure = false;
+
+  static const _secureChannel = MethodChannel('example/secure');
 
   @override
   void dispose() {
@@ -54,6 +60,18 @@ class _AccountTabState extends State<AccountTab> {
           child: const Text('Save'),
         ),
         if (_saved) const Padding(padding: EdgeInsets.only(top: 12), child: Text('Saved.')),
+        if (Platform.isAndroid)
+          SwitchListTile(
+            key: const ValueKey('secure'),
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Secure window (FLAG_SECURE)'),
+            subtitle: const Text('As an app lock sets it: Viper takes no picture.'),
+            value: _secure,
+            onChanged: (on) async {
+              await _secureChannel.invokeMethod<void>('set', on);
+              setState(() => _secure = on);
+            },
+          ),
       ],
     );
   }

@@ -121,10 +121,8 @@ void main() {
     final runtime = Viper.runtime!;
     final stamp = DateTime.now().millisecondsSinceEpoch;
 
-    // The launcher off the tab bar it sits on by default, then the Account tab, so the picture
-    // shows the password masked (D331).
-    runtime.moveLauncher(runtime.layout.copyWith(spot: 'right'));
-    await tester.pump(const Duration(milliseconds: 300));
+    // The Account tab, so the picture shows the password masked (D331). The launcher sits above
+    // the tab bar on its own (D351), so the tab is there to tap.
     await tester.tap(find.text('Account'));
     await tester.pump(const Duration(milliseconds: 500));
     await reportWholeScreen(tester, runtime, 'The Save button stays grey (integration $stamp)');

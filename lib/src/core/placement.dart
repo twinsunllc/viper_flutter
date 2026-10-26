@@ -157,8 +157,10 @@ class LauncherLayout {
     moved: moved ?? this.moved,
   );
 
-  /// The round button's top left on a screen of [size] with [padding] for the safe area.
-  Offset buttonOffset(Size size, EdgeInsets padding) => spotOffset(spot, size, padding, raise: raise);
+  /// The round button's top left on a screen of [size] with [padding] for the safe area, above
+  /// the app's bottom bar ([lift]) on a bottom spot unless the project raises it itself (D351).
+  Offset buttonOffset(Size size, EdgeInsets padding, {double lift = 0}) =>
+      spotOffset(spot, size, padding, raise: raise > 0 ? raise : lift);
 
   /// The edge tab's rectangle.
   Rect tabRect(Size size, EdgeInsets padding) {

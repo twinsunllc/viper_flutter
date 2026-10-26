@@ -2,10 +2,12 @@
 // tab. A tap opens the sheet; a drag moves the button to the nearest of the eight spots (or the
 // tab along its edge); a long press offers tucking it to the edge or hiding it. It's one button
 // for VoiceOver and TalkBack, with the counts in its label and the menu's choices as actions.
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/semantics.dart';
 import 'package:flutter/widgets.dart';
+import 'package:viper_flutter/src/core/obstruction.dart';
 import 'package:viper_flutter/src/core/placement.dart';
 import 'package:viper_flutter/src/core/runtime.dart';
 import 'package:viper_flutter/src/ui/tokens.dart';
@@ -36,6 +38,33 @@ class ViperLauncher extends StatefulWidget {
 class _ViperLauncherState extends State<ViperLauncher> {
   Offset? _drag;
   bool _menu = false;
+
+  /// How far above the safe area the app's bottom bar reaches: a bottom spot sits above it (D351).
+  double _lift = 0;
+  Timer? _watch;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+    // Bars come and go with the app's screens; a look a second is cheap and keeps up.
+    _watch = Timer.periodic(const Duration(seconds: 1), (_) => _measure());
+  }
+
+  @override
+  void dispose() {
+    _watch?.cancel();
+    super.dispose();
+  }
+
+  void _measure() {
+    if (!mounted || _drag != null) return;
+    final root = widget.runtime.appKey.currentContext;
+    if (root is! Element) return;
+    final media = MediaQuery.of(context);
+    final lift = bottomBarLift(root, screen: media.size, padding: media.padding);
+    if ((lift - _lift).abs() > 0.5) setState(() => _lift = lift);
+  }
 
   ViperRuntime get _runtime => widget.runtime;
 
@@ -84,7 +113,7 @@ class _ViperLauncherState extends State<ViperLauncher> {
         left: layout.edgeSide == 'left',
       );
     } else {
-      final at = _drag ?? layout.buttonOffset(size, padding);
+      final at = _drag ?? layout.buttonOffset(size, padding, lift: _lift);
       rect = Rect.fromLTWH(at.dx, at.dy, launcherSize, launcherSize);
       body = _RoundButton(
         palette: palette,

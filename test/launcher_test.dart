@@ -12,18 +12,24 @@ import 'package:viper_flutter/src/ui/skeleton.dart';
 
 import 'support/fakes.dart';
 
-Future<(Harness, ViperRuntime)> pumpApp(WidgetTester tester, {MemoryStore? store}) async {
+Future<(Harness, ViperRuntime)> pumpApp(
+  WidgetTester tester, {
+  MemoryStore? store,
+  Widget? bottomBar,
+  ConfigOutcome? outcome,
+}) async {
   tester.view.physicalSize = const Size(1179, 2556);
   tester.view.devicePixelRatio = 3;
   tester.view.padding = const FakeViewPadding(top: 177, bottom: 102);
   addTearDown(tester.view.reset);
-  final h = Harness(view: tester.view, store: store);
+  final h = Harness(view: tester.view, store: store, outcome: outcome);
   final runtime = h.runtime();
   addTearDown(runtime.dispose);
   await runtime.boot();
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
+        bottomNavigationBar: bottomBar,
         body: Center(
           child: ElevatedButton(onPressed: () {}, child: const Text('Save')),
         ),
@@ -165,5 +171,50 @@ void main() {
     expect(launcherLabel(0, 0), 'Viper');
     expect(launcherLabel(3, 0), 'Viper, 3 open');
     expect(launcherLabel(3, 2), 'Viper, 3 open, 2 needs you');
+  });
+
+  testWidgets("a bottom spot sits above the app's bottom navigation bar (D351)", (tester) async {
+    await pumpApp(
+      tester,
+      bottomBar: NavigationBar(
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.work_outline), label: 'Jobs'),
+          NavigationDestination(icon: Icon(Icons.person_outline), label: 'Account'),
+        ],
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    final bar = tester.getRect(find.byType(NavigationBar));
+    final button = tester.getRect(launcher);
+    expect(button.bottom, lessThanOrEqualTo(bar.top - 15.9), reason: '$button over $bar');
+    expect(button.right, 393 - 16);
+  });
+
+  testWidgets("the project's own raise wins over the lift (D295, D351)", (tester) async {
+    await pumpApp(
+      tester,
+      outcome: ConfigOk(
+        exampleConfig(
+          launcher: {
+            'style': 'corner',
+            'spot': 'bottom-right',
+            'raise': 200,
+            'edge_side': 'right',
+            'edge_position': 50,
+          },
+        ),
+      ),
+      bottomBar: const BottomAppBar(child: SizedBox(height: 40)),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(tester.getRect(launcher).bottom, 852 - 34 - 16 - 200);
+  });
+
+  testWidgets('with no bottom bar, it sits on the safe area as before', (tester) async {
+    await pumpApp(tester);
+    await tester.pump();
+    expect(tester.getRect(launcher).bottom, 852 - 34 - 16);
   });
 }

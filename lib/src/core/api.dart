@@ -195,9 +195,11 @@ class HttpViperApi implements ViperApi {
         final expires = DateTime.tryParse('${json['expires_at']}') ?? DateTime.now().add(const Duration(hours: 1));
         return PictureStored(json['id'] as String, expires);
       }
-      if (response.statusCode >= 500 || json is! Map) {
-        return PictureUnreachable('Viper answered ${response.statusCode}');
-      }
+      final status = response.statusCode;
+      // Worth waiting for and sending again: Viper down, busy or slow. Anything else it said no
+      // to won't work next time either, so the report goes without the picture.
+      if (status >= 500 || status == 408 || status == 429) return PictureUnreachable('Viper answered $status');
+      if (json is! Map) return PictureRefused('http_$status', 'Viper answered $status.');
       return PictureRefused(
         '${json['reason'] ?? response.statusCode}',
         '${json['message'] ?? 'Viper refused the picture.'}',

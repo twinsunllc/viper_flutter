@@ -302,6 +302,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
       ViperSlots.identityPending = false;
       ViperSlots.pendingIdentity = null;
       ViperSlots.pendingRefresh = null;
+      _scheduleRefresh();
     }
     _context = mergeContext(_context, ViperSlots.pendingContext);
     ViperSlots.pendingContext.clear();
@@ -393,9 +394,11 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
       panelUrl.replace(queryParameters: {...panelUrl.queryParameters, 'bridge': 'native'});
 
   Future<void> _fetchIdentity() async {
+    final asked = _identityGeneration;
     try {
       final signed = await identityCallback!();
-      if (signed != null) identify(signed);
+      // The app identified someone, or signed out, while the callback ran: that wins.
+      if (signed != null && !_disposed && asked == _identityGeneration) identify(signed);
     } catch (error) {
       services.log('the identity callback failed ($error)');
     }
@@ -1098,8 +1101,10 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
 
   @override
   void identify(SignedIdentity? identity, {IdentityRefresh? refresh}) {
+    _identityGeneration++;
     _identity = identity;
-    _refresh = refresh ?? _refresh ?? identityCallback;
+    // Signing out drops the refresh too, so the next person is never refreshed as the last one.
+    _refresh = identity == null ? null : (refresh ?? _refresh ?? identityCallback);
     _scheduleRefresh();
     send({'type': 'viper:identity', 'identity': identity});
   }
@@ -1107,8 +1112,13 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   IdentityRefresh? _refresh;
   Timer? _refreshTimer;
 
+  /// Moves on every identify, as the web's page API counts them: a refresh or identity callback
+  /// that answers after the identity changed is dropped.
+  int _identityGeneration = 0;
+
   /// A signature expires (D86): a minute before it does, the app's refresh callback is asked for
-  /// a fresh one, as the web's page API does.
+  /// a fresh one, as the web's page API does, and never sooner than ten seconds from now, so a
+  /// token already in its last minute can't make the refresh loop.
   void _scheduleRefresh() {
     _refreshTimer?.cancel();
     final refresh = _refresh;
@@ -1118,10 +1128,12 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     final due = DateTime.fromMillisecondsSinceEpoch(
       exp * 1000,
     ).subtract(const Duration(minutes: 1)).difference(services.clock());
-    _refreshTimer = Timer(due.isNegative ? Duration.zero : due, () async {
+    const soonest = Duration(seconds: 10);
+    final expected = _identityGeneration;
+    _refreshTimer = Timer(due < soonest ? soonest : due, () async {
       try {
         final fresh = await refresh();
-        if (!_disposed) identify(fresh, refresh: refresh);
+        if (!_disposed && expected == _identityGeneration) identify(fresh, refresh: refresh);
       } catch (error) {
         services.log('the identity refresh failed ($error)');
       }

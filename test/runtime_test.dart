@@ -8,6 +8,7 @@ import 'package:viper_flutter/src/core/api.dart';
 import 'package:viper_flutter/src/core/environment.dart';
 import 'package:viper_flutter/src/core/runtime.dart';
 import 'package:viper_flutter/src/core/store.dart';
+import 'package:viper_flutter/src/slots.dart';
 
 import 'support/fakes.dart';
 
@@ -525,6 +526,74 @@ void main() {
       await tester.pump(const Duration(seconds: 31));
       expect(asked, 1);
       expect((h.panel!.of('viper:identity').last['identity']! as Map)['signature'], 'sig-${exp + 600}');
+      runtime.identify(null);
+    });
+
+    Map<String, Object?> signedUntil(int exp, [String id = 'u_7']) => {
+      'v': 1,
+      'payload': {'id': id, 'email': '$id@example.com', 'name': 'Dana Ortiz', 'iat': exp - 600, 'exp': exp},
+      'signature': 'sig-$id-$exp',
+    };
+    int secondsFromNow(Duration d) => Harness.now.add(d).millisecondsSinceEpoch ~/ 1000;
+
+    testWidgets('signing out while a refresh runs stays signed out, as on the web', (tester) async {
+      final (h, runtime) = await started(tester);
+      await ready(tester, h);
+      final exp = secondsFromNow(const Duration(minutes: 2));
+      final answer = Completer<SignedIdentity?>();
+      var asked = 0;
+      runtime.identify(
+        signedUntil(exp),
+        refresh: () {
+          asked++;
+          return answer.future;
+        },
+      );
+      await tester.pump(const Duration(minutes: 1, seconds: 1));
+      expect(asked, 1);
+      runtime.identify(null);
+      answer.complete(signedUntil(exp + 600));
+      await tester.pump();
+      expect(h.panel!.of('viper:identity').last['identity'], isNull);
+      await tester.pump(const Duration(hours: 1));
+      expect(asked, 1, reason: 'signed out, nothing is refreshed');
+    });
+
+    testWidgets('a token already in its last minute waits ten seconds before each refresh', (tester) async {
+      final (h, runtime) = await started(tester);
+      await ready(tester, h);
+      var asked = 0;
+      runtime.identify(
+        signedUntil(secondsFromNow(const Duration(seconds: 30))),
+        refresh: () async {
+          asked++;
+          return signedUntil(secondsFromNow(const Duration(seconds: 30)));
+        },
+      );
+      await tester.pump(const Duration(seconds: 9));
+      expect(asked, 0);
+      await tester.pump(const Duration(seconds: 1));
+      expect(asked, 1);
+      await tester.pump(const Duration(seconds: 9));
+      expect(asked, 1, reason: 'never a loop');
+      runtime.identify(null);
+    });
+
+    testWidgets('an identity set before start is refreshed with the callback it came with', (tester) async {
+      final exp = secondsFromNow(const Duration(minutes: 3));
+      var asked = 0;
+      // What Viper.identify keeps before start (markers.dart).
+      ViperSlots.identityPending = true;
+      ViperSlots.pendingIdentity = signedUntil(exp);
+      ViperSlots.pendingRefresh = () async {
+        asked++;
+        return signedUntil(exp + 600);
+      };
+      final (h, runtime) = await started(tester);
+      await ready(tester, h);
+      await tester.pump(const Duration(minutes: 2, seconds: 1));
+      expect(asked, 1);
+      expect((h.panel!.of('viper:identity').last['identity']! as Map)['signature'], 'sig-u_7-${exp + 600}');
       runtime.identify(null);
     });
 

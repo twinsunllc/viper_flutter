@@ -294,6 +294,8 @@ void main() {
     final before = h.native.captures.length;
     await again.handle(submit);
     expect(h.native.captures.length, before, reason: 'the kept picture, not a new one');
+    expect(h.api.uploads.last, h.api.uploads.first, reason: 'the same picture, uploaded again');
+    expect((h.panel!.of('viper:report').single['payload']! as Map)['device_picture'], 'pic-9');
     expect(h.shots.shots, isEmpty, reason: 'sent, it goes');
   });
 

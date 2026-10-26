@@ -96,7 +96,10 @@ class PluginDevice implements ViperDevice {
       return DeviceFacts(
         os: 'iOS',
         osVersion: ios.systemVersion,
-        model: ios.modelName.isNotEmpty ? ios.modelName : ios.utsname.machine,
+        // A simulator has no model name of its own.
+        model: ios.modelName.isNotEmpty && ios.modelName != 'Unknown device'
+            ? ios.modelName
+            : (ios.isPhysicalDevice ? ios.utsname.machine : '${ios.model} Simulator'),
         manufacturer: 'Apple',
         physical: ios.isPhysicalDevice,
         appId: package.packageName,

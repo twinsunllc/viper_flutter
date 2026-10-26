@@ -10,6 +10,7 @@ import 'package:viper_flutter/src/core/activity.dart';
 import 'package:viper_flutter/src/core/api.dart';
 import 'package:viper_flutter/src/core/camera.dart';
 import 'package:viper_flutter/src/core/device.dart';
+import 'package:viper_flutter/src/core/mask.dart';
 import 'package:viper_flutter/src/core/opener.dart';
 import 'package:viper_flutter/src/core/runtime.dart';
 import 'package:viper_flutter/src/core/screens.dart';
@@ -346,7 +347,7 @@ class FixedScreens extends ScreenTracker {
   final String route;
 
   @override
-  Map<String, Object?> current({String? build}) => {
+  Map<String, Object?> current({String? build, PrivacyLevel level = PrivacyLevel.standard}) => {
     'route': route,
     'url': '',
     'title': displayName(route),

@@ -1,6 +1,13 @@
 package dev.twinsun.viper.viper_flutter
 
 import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.webkit.MimeTypeMap
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -23,6 +30,7 @@ import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.PluginRegistry
 import java.io.ByteArrayOutputStream
 import java.util.TimeZone
 
@@ -30,33 +38,92 @@ import java.util.TimeZone
  * Viper's native side (D338). Registering does nothing else (D336): no sensor listener or
  * observer until Dart asks for something.
  */
-class ViperFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware {
+class ViperFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware, PluginRegistry.ActivityResultListener {
   private var channel: MethodChannel? = null
   private var activity: Activity? = null
+  private var context: Context? = null
+  private var shake: Shake? = null
+  private var binding: ActivityPluginBinding? = null
+  private var picking: MethodChannel.Result? = null
 
   override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+    context = binding.applicationContext
     channel = MethodChannel(binding.binaryMessenger, "viper_flutter").also { it.setMethodCallHandler(this) }
   }
 
   override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+    shake?.stop()
+    shake = null
     channel?.setMethodCallHandler(null)
     channel = null
   }
 
   override fun onAttachedToActivity(binding: ActivityPluginBinding) {
-    activity = binding.activity
+    attach(binding)
   }
 
   override fun onDetachedFromActivityForConfigChanges() {
-    activity = null
+    detach()
   }
 
   override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
-    activity = binding.activity
+    attach(binding)
   }
 
   override fun onDetachedFromActivity() {
+    detach()
+  }
+
+  private fun attach(binding: ActivityPluginBinding) {
+    activity = binding.activity
+    this.binding = binding
+    binding.addActivityResultListener(this)
+  }
+
+  private fun detach() {
+    binding?.removeActivityResultListener(this)
+    binding = null
     activity = null
+  }
+
+  /** The system file picker for the panel's file inputs (D235), answered with content URIs. */
+  private fun pickFiles(call: MethodCall, result: MethodChannel.Result) {
+    val current = activity
+    if (current == null || picking != null) {
+      result.success(emptyList<String>())
+      return
+    }
+    val accept = (call.argument<List<String>>("accept") ?: emptyList()).flatMap { it.split(",") }.map { it.trim() }.filter { it.isNotEmpty() }
+    val types = accept.map { if (it.startsWith(".")) MimeTypeMap.getSingleton().getMimeTypeFromExtension(it.drop(1)) ?: "*/*" else it }.distinct()
+    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+      addCategory(Intent.CATEGORY_OPENABLE)
+      type = "*/*"
+      if (types.isNotEmpty() && "*/*" !in types) putExtra(Intent.EXTRA_MIME_TYPES, types.toTypedArray())
+      putExtra(Intent.EXTRA_ALLOW_MULTIPLE, call.argument<Boolean>("multiple") == true)
+    }
+    picking = result
+    current.startActivityForResult(intent, PICK_FILES)
+  }
+
+  override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+    if (requestCode != PICK_FILES) return false
+    val result = picking ?: return true
+    picking = null
+    val uris = mutableListOf<String>()
+    if (resultCode == Activity.RESULT_OK && data != null) {
+      val clip = data.clipData
+      if (clip != null) {
+        for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri.toString())
+      } else {
+        data.data?.let { uris.add(it.toString()) }
+      }
+    }
+    result.success(uris)
+    return true
+  }
+
+  companion object {
+    private const val PICK_FILES = 0x5649
   }
 
   override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -76,6 +143,20 @@ class ViperFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activ
         Screenshot(current, boxes, call, result).take()
       }
       "timezone" -> result.success(TimeZone.getDefault().id)
+      "startShake" -> {
+        val sensors = context?.getSystemService(Context.SENSOR_SERVICE) as SensorManager?
+        if (sensors == null) {
+          result.success(false)
+          return
+        }
+        if (shake == null) shake = Shake(sensors) { channel?.invokeMethod("shake", null) }
+        result.success(shake!!.start())
+      }
+      "pickFiles" -> pickFiles(call, result)
+      "stopShake" -> {
+        shake?.stop()
+        result.success(null)
+      }
       else -> result.notImplemented()
     }
   }
@@ -179,4 +260,38 @@ private class Screenshot(
       }
     }
   }
+}
+
+/**
+ * A shake opens Viper (D335): the accelerometer through SensorManager, about 2.5 g at most once a
+ * second. Listening starts only when Dart asks, after Viper.start and only where the project has
+ * shake on; nothing at registration (D336).
+ */
+private class Shake(private val sensors: SensorManager, private val onShake: () -> Unit) : SensorEventListener {
+  private var last = 0L
+  private var listening = false
+
+  fun start(): Boolean {
+    if (listening) return true
+    val accelerometer = sensors.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) ?: return false
+    listening = sensors.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_UI)
+    return listening
+  }
+
+  fun stop() {
+    if (listening) sensors.unregisterListener(this)
+    listening = false
+  }
+
+  override fun onSensorChanged(event: SensorEvent) {
+    val (x, y, z) = Triple(event.values[0], event.values[1], event.values[2])
+    val g = Math.sqrt((x * x + y * y + z * z).toDouble()) / SensorManager.GRAVITY_EARTH
+    val now = SystemClock.elapsedRealtime()
+    if (g > 2.5 && now - last > 1000) {
+      last = now
+      onShake()
+    }
+  }
+
+  override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
 }

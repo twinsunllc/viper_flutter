@@ -57,6 +57,12 @@ void main() {
     }
     expect(status.replaceAll('"', ''), '200');
 
+    // A field's text is at least 16 px in the app's web view, so iOS never zooms into one.
+    final size = await web.runJavaScriptReturningResult(
+      "(() => { const i = document.createElement('input'); i.className = 'inp'; document.body.appendChild(i); const px = parseFloat(getComputedStyle(i).fontSize); i.remove(); return String(px); })()",
+    );
+    expect(double.parse('$size'.replaceAll('"', '')), greaterThanOrEqualTo(16));
+
     // The panel's close button sends viper:close; Dart closes the sheet.
     await web.runJavaScript("ViperBridge.postMessage(JSON.stringify({type: 'viper:close'}))");
     await pumpUntil(tester, () => !runtime.sheetOpen);

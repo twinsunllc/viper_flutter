@@ -666,7 +666,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   }
 
   /// The report's files (D112). Over the bridge a file's body is its text: the panel makes the
-  /// Blob it uploads (D345).
+  /// Blob it uploads (D347).
   static List<Map<String, Object?>> reportFiles({required List<Object?> console, required List<Object?> network}) => [
     {'field': 'console', 'filename': 'console.json', 'body': jsonEncode(console)},
     {'field': 'network', 'filename': 'network.json', 'body': jsonEncode(network)},

@@ -1,4 +1,6 @@
 // The launcher and the sheet on screen (W01, D169, D295, D335, D44).
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -216,5 +218,26 @@ void main() {
     await pumpApp(tester);
     await tester.pump();
     expect(tester.getRect(launcher).bottom, 852 - 34 - 16);
+  });
+
+  testWidgets("a bar on a covered route doesn't lift the launcher over the route on top", (tester) async {
+    await pumpApp(
+      tester,
+      bottomBar: NavigationBar(
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.work_outline), label: 'Jobs'),
+          NavigationDestination(icon: Icon(Icons.person_outline), label: 'Account'),
+        ],
+      ),
+    );
+    await tester.pump();
+    final lifted = tester.getRect(launcher).bottom;
+    final navigator = tester.state<NavigatorState>(find.byType(Navigator).first);
+    unawaited(navigator.push(MaterialPageRoute<void>(builder: (_) => const Scaffold(body: Text('Details')))));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    expect(tester.getRect(launcher).bottom, 852 - 34 - 16);
+    expect(lifted, lessThan(852 - 34 - 16));
   });
 }

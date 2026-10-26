@@ -37,6 +37,21 @@ class FakePlatformView implements PlatformViewController {
   Future<void> dispose() async {}
 }
 
+/// Stand-ins named like other packages' widgets: Viper knows them by type name.
+class SvgPicture extends StatelessWidget {
+  const SvgPicture({super.key});
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(width: 30, height: 30);
+}
+
+class InAppWebView extends StatelessWidget {
+  const InAppWebView({super.key});
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(width: 200, height: 80);
+}
+
 Widget screen() {
   final image = MemoryImage(pixel);
   return MaterialApp(
@@ -237,8 +252,56 @@ void main() {
     expect(boxesAt(tester, PrivacyLevel.maximum), hasLength(1), reason: 'the shown tab\'s words only');
   });
 
-  test('web views from other packages, and pictures from SVG packages, are known by name', () {
-    expect(webViewWidgetNames, containsAll(['WebViewWidget', 'InAppWebView']));
-    expect(pictureWidgetNames, contains('SvgPicture'));
+  testWidgets("another package's web view is masked at Standard, and its SVG from Strict, by name", (tester) async {
+    await pumpScreen(
+      tester,
+      const MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              SvgPicture(key: ValueKey('svg')),
+              InAppWebView(key: ValueKey('web')),
+            ],
+          ),
+        ),
+      ),
+    );
+    final web = tester.getRect(find.byKey(const ValueKey('web')));
+    final svg = tester.getRect(find.byKey(const ValueKey('svg')));
+    expect(covered(boxesAt(tester, PrivacyLevel.standard), web), isTrue);
+    expect(covered(boxesAt(tester, PrivacyLevel.standard), svg), isFalse);
+    expect(covered(boxesAt(tester, PrivacyLevel.strict), svg), isTrue);
+  });
+
+  testWidgets('text scrolled under a pinned, translucent header is still masked there (failing closed)', (
+    tester,
+  ) async {
+    await pumpScreen(
+      tester,
+      MaterialApp(
+        home: Scaffold(
+          body: CustomScrollView(
+            key: const ValueKey('scroll'),
+            slivers: [
+              const SliverAppBar(pinned: true, backgroundColor: Color(0x80FFFFFF), title: Text('Header')),
+              SliverList.list(children: [for (var i = 0; i < 40; i++) SizedBox(height: 40, child: Text('Row $i'))]),
+            ],
+          ),
+        ),
+      ),
+    );
+    tester
+        .state<ScrollableState>(
+          find.descendant(of: find.byKey(const ValueKey('scroll')), matching: find.byType(Scrollable)).first,
+        )
+        .position
+        .jumpTo(300);
+    await tester.pump();
+    final header = tester.getRect(find.byType(AppBar));
+    final boxes = boxesAt(tester, PrivacyLevel.maximum);
+    final under = boxes
+        .where((box) => box.top < header.bottom - 1 && box != tester.getRect(find.text('Header')))
+        .toList();
+    expect(under, isNotEmpty, reason: 'the rows that scrolled under the header show through it');
   });
 }

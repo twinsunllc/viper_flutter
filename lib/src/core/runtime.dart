@@ -207,8 +207,15 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   String get _stateKey => 'viper.$key.panel_state';
   String get _themeKey => 'viper.$key.theme';
 
-  /// Viper's origin, for what the panel may open in the sign-in view.
-  Uri get origin => host.replace(path: '', query: null, fragment: null);
+  /// The panel's URL from the config: its origin is the one the web view may load and the sign-in
+  /// view may open, so both checks agree.
+  Uri? panelUrl;
+
+  /// Whether [url] is on the panel's origin.
+  bool onPanelOrigin(Uri url) {
+    final base = panelUrl;
+    return base != null && url.scheme == base.scheme && url.host == base.host && url.port == base.port;
+  }
 
   /// The theme's colors now.
   ViperPalette get palette => ViperPalette.of(theme, services.view().platformDispatcher.platformBrightness);
@@ -287,6 +294,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     layout = LauncherLayout.restore(await services.store.readJson(_launcherKey), project);
     final urls = ok['urls'];
     final panelUrl = urls is Map && urls['panel'] is String ? Uri.tryParse(urls['panel'] as String) : null;
+    this.panelUrl = panelUrl;
     if (panelUrl == null) {
       services.log('the config has no panel URL; Viper is off');
       _setPhase(ViperPhase.refused);
@@ -484,7 +492,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
       case 'viper:open:auth':
         final url = Uri.tryParse(message['url'] is String ? message['url'] as String : '');
         // Only Viper's own sign-in page opens in the sign-in view (D334).
-        if (url != null && url.scheme == host.scheme && url.host == host.host && url.port == host.port) {
+        if (url != null && onPanelOrigin(url)) {
           await services.opener.openAuth(url);
         }
       case 'viper:auth:done':
@@ -658,7 +666,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   }
 
   /// The report's files (D112). Over the bridge a file's body is its text: the panel makes the
-  /// Blob it uploads (D342).
+  /// Blob it uploads (D345).
   static List<Map<String, Object?>> reportFiles({required List<Object?> console, required List<Object?> network}) => [
     {'field': 'console', 'filename': 'console.json', 'body': jsonEncode(console)},
     {'field': 'network', 'filename': 'network.json', 'body': jsonEncode(network)},

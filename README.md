@@ -170,8 +170,9 @@ Pinning still applies through Viper's wrapper: it forwards every property to the
 Bottom right by default, or where the project's settings start it (D295). A bottom spot sits
 above the app's bottom navigation bar or tab bar and the bottom safe area (D351); a project's own
 raise wins. Drag it to any of the eight spots; long press to tuck it to an edge tab (and back), or
-to **Hide Viper**. Shaking the phone opens Viper, hidden or not (on the simulator: Device >
-Shake); a project can turn shake off in its settings, and then hiding isn't offered. Where it sits
+to **Hide Viper**. Shaking the phone opens Viper, hidden or not; a project can turn shake off in its
+settings, and then hiding isn't offered, nor where the phone can't feel a shake (the iOS simulator
+has no accelerometer; on the Android emulator, shake it from Extended controls > Virtual sensors). Where it sits
 and whether it's hidden are remembered per install, and turning the phone or resizing an iPad split
 view puts it back on its spot. It reads as one button to VoiceOver and TalkBack, with the counts in
 its label and tuck and hide as actions.
@@ -271,7 +272,8 @@ local environment of Harbor, key `hbr_loc_9w` (D342), which the example uses by 
 
    The item lands in staging's staff portal, `https://viper-volatile.twinsun.dev/staff/projects/harbor/items`.
 
-Also worth a try: hide the launcher from its long press and shake it back; turn the phone; open a
+Also worth a try: hide the launcher from its long press and shake it back (a phone or the Android
+emulator); turn the phone; open a
 dialog and pick This dialog; on Android, turn on Account's "Secure window" and see the report say
 there's no picture.
 

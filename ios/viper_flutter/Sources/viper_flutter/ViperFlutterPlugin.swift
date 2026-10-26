@@ -1,6 +1,5 @@
 import CoreMotion
 import Flutter
-import ObjectiveC
 import UIKit
 
 /// Viper's native side (D338). Registering does nothing else (D336): no sensor listener,
@@ -25,8 +24,7 @@ public class ViperFlutterPlugin: NSObject, FlutterPlugin {
     case "timezone":
       result(TimeZone.current.identifier)
     case "startShake":
-      Shake.start { [weak self] in self?.channel.invokeMethod("shake", arguments: nil) }
-      result(true)
+      result(Shake.start { [weak self] in self?.channel.invokeMethod("shake", arguments: nil) })
     case "stopShake":
       Shake.stop()
       result(nil)
@@ -130,19 +128,18 @@ enum Screenshot {
   }
 }
 
-/// A shake opens Viper (D335): the accelerometer through CoreMotion on a phone, and the system's
-/// shake gesture (UIWindow's motionEnded, which the simulator's Device > Shake sends). Started only
-/// when Dart asks, after Viper.start and only where the project has shake on; nothing at
-/// registration (D336).
+/// A shake opens Viper (D335): the accelerometer through CoreMotion, about 2.5 g at most once a
+/// second. Started only when Dart asks, after Viper.start and only where the project has shake on;
+/// nothing at registration (D336). The simulator has no accelerometer, so shake is for a phone.
 enum Shake {
   static let motion = CMMotionManager()
   static var onShake: (() -> Void)?
   static var last = Date.distantPast
-  static var swizzled = false
 
-  static func start(_ handler: @escaping () -> Void) {
+  static func start(_ handler: @escaping () -> Void) -> Bool {
     onShake = handler
-    if motion.isAccelerometerAvailable && !motion.isAccelerometerActive {
+    guard motion.isAccelerometerAvailable else { return false }
+    if !motion.isAccelerometerActive {
       motion.accelerometerUpdateInterval = 0.05
       motion.startAccelerometerUpdates(to: .main) { data, _ in
         guard let a = data?.acceleration else { return }
@@ -150,7 +147,7 @@ enum Shake {
         if sqrt(a.x * a.x + a.y * a.y + a.z * a.z) > 2.5 { fire() }
       }
     }
-    swizzleMotionEnded()
+    return true
   }
 
   static func stop() {
@@ -162,28 +159,5 @@ enum Shake {
     guard let handler = onShake, Date().timeIntervalSince(last) > 1 else { return }
     last = Date()
     handler()
-  }
-
-  /// Adds Viper's motionEnded to UIWindow alone, calling on to what was there, so every other
-  /// responder is untouched.
-  static func swizzleMotionEnded() {
-    guard !swizzled else { return }
-    swizzled = true
-    let original = #selector(UIResponder.motionEnded(_:with:))
-    let replacement = #selector(UIWindow.viper_motionEnded(_:with:))
-    guard let originalMethod = class_getInstanceMethod(UIWindow.self, original),
-          let replacementMethod = class_getInstanceMethod(UIWindow.self, replacement) else { return }
-    if class_addMethod(UIWindow.self, original, method_getImplementation(replacementMethod), method_getTypeEncoding(replacementMethod)) {
-      class_replaceMethod(UIWindow.self, replacement, method_getImplementation(originalMethod), method_getTypeEncoding(originalMethod))
-    } else {
-      method_exchangeImplementations(originalMethod, replacementMethod)
-    }
-  }
-}
-
-extension UIWindow {
-  @objc func viper_motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
-    if motion == .motionShake { Shake.fire() }
-    viper_motionEnded(motion, with: event)
   }
 }

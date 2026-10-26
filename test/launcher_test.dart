@@ -253,4 +253,13 @@ void main() {
     await tester.pump();
     expect(tester.getRect(launcher).bottomRight, const Offset(500 - 16, 682.6666666666666 - 16));
   });
+
+  testWidgets("Viper's own words are in its text style, never Flutter's debug one", (tester) async {
+    await pumpApp(tester);
+    await tester.longPress(launcher);
+    await tester.pumpAndSettle();
+    final style = DefaultTextStyle.of(tester.element(find.text('Tuck to the edge'))).style;
+    expect(style.decoration, TextDecoration.none);
+    expect(style.fontFamily, isNot('monospace'));
+  });
 }

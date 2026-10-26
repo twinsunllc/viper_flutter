@@ -53,18 +53,29 @@ class _ViperLayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.maybeOf(context) ?? MediaQueryData.fromView(View.of(context));
-    return MediaQuery(
-      data: media,
-      // Viper's own layer: only its parts take touches; the rest of the screen is the app's.
-      child: Stack(
-        children: [
-          if (runtime.outline != null && runtime.sheetShown) PickOutline(rect: runtime.outline!),
-          if (runtime.picking) PickCatcher(runtime: runtime),
-          ViperSheet(runtime: runtime),
-          if (!runtime.sheetOpen && !runtime.layout.hidden) ViperLauncher(runtime: runtime),
-          if (runtime.picking) PickHandle(runtime: runtime),
-          ViperToastLayer(runtime: runtime),
-        ],
+    // Viper's layer sits above the app's navigator, outside any Material, so it sets its own
+    // text style: without one, Flutter draws text in its debug style (yellow underlines).
+    return DefaultTextStyle(
+      style: TextStyle(
+        color: runtime.palette.text,
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        decoration: TextDecoration.none,
+        height: 1.3,
+      ),
+      child: MediaQuery(
+        data: media,
+        // Viper's own layer: only its parts take touches; the rest of the screen is the app's.
+        child: Stack(
+          children: [
+            if (runtime.outline != null && runtime.sheetShown) PickOutline(rect: runtime.outline!),
+            if (runtime.picking) PickCatcher(runtime: runtime),
+            ViperSheet(runtime: runtime),
+            if (!runtime.sheetOpen && !runtime.layout.hidden) ViperLauncher(runtime: runtime),
+            if (runtime.picking) PickHandle(runtime: runtime),
+            ViperToastLayer(runtime: runtime),
+          ],
+        ),
       ),
     );
   }

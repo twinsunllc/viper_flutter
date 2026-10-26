@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:viper_flutter/src/core/activity.dart';
 import 'package:viper_flutter/src/core/api.dart';
 import 'package:viper_flutter/src/core/camera.dart';
 import 'package:viper_flutter/src/core/device.dart';
@@ -271,7 +272,11 @@ class Harness {
   static final DateTime now = DateTime.utc(2026, 10, 26, 19);
 
   /// The runtime for key `hbr_loc_9w` on the local Viper.
+  /// The console and network the runtime reports.
+  final ActivityLog activity = ActivityLog(clock: () => now);
+
   ViperRuntime runtime() => native.runtime = ViperRuntime(
+    activity: activity,
     key: 'hbr_loc_9w',
     host: Uri.parse('http://localhost:4830'),
     uptime: () => const Duration(seconds: 42),

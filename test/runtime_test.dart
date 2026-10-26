@@ -1,5 +1,6 @@
 // Viper's start and the bridge's message table (flutter.md), from Dart's side.
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -379,6 +380,52 @@ void main() {
       expect(env['screenshot'], {'method': 'native', 'platform_views_blocked': false});
       expect((env['app']! as Map)['build'], '2.4.0+311');
       writeFixture('DeviceEnvironmentInfo', 'iphone', env);
+    });
+
+    testWidgets("the report carries the console and network, masked as the project's level says (D333, D80)", (
+      tester,
+    ) async {
+      Future<Map<String, Object?>> report(String privacy) async {
+        final (h, runtime) = await started(
+          tester,
+          harness: Harness(
+            view: tester.view,
+            outcome: ConfigOk(exampleConfig(privacy: privacy)),
+          ),
+        );
+        await ready(tester, h);
+        h.activity.log('error', 'Card 4242 declined');
+        h.activity.start('POST', Uri.parse('https://api.example.com/charges?card=4242'))
+          ..status = 402
+          ..duration = const Duration(milliseconds: 120)
+          ..requestId = 'req-9';
+        h.panel!.post({
+          'type': 'viper:submit',
+          'client_id': 'c-$privacy',
+          'report': {'scope': 'screen', 'body': 'Charge fails'},
+        });
+        await tester.pump();
+        await tester.pump();
+        final files = h.panel!.of('viper:report').single['files']! as List<Object?>;
+        return {
+          for (final file in files.cast<Map<String, Object?>>())
+            file['field']! as String: jsonDecode(file['body']! as String),
+        };
+      }
+
+      final standard = await report('standard');
+      final console = (standard['console']! as List).single as Map<String, Object?>;
+      final network = (standard['network']! as List).single as Map<String, Object?>;
+      expect(console['text'], 'Card 4242 declined');
+      expect(network['path'], 'https://api.example.com/charges?card=4242');
+      writeFixture('ConsoleEntry', 'error', console);
+      writeFixture('NetworkEntry', 'call', network);
+
+      final strict = await report('strict');
+      expect(((strict['console']! as List).single as Map)['text'], '•••• •••• ••••••••');
+      final masked = (strict['network']! as List).single as Map<String, Object?>;
+      expect(masked['path'], 'https://api.example.com/charges');
+      writeFixture('NetworkEntry', 'call_strict', masked);
     });
 
     testWidgets('a silent capture of an item that exists is the screen as it is (D20, D113)', (tester) async {

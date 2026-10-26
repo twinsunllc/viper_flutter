@@ -6,10 +6,10 @@
   "key": "hbr_loc_9w",
   "platform": "flutter",
   "screen": {
-    "route": "/",
+    "route": "CastHubScreen",
     "url": "",
-    "title": "Home",
-    "build": "0.1.0+1"
+    "title": "Cast hub",
+    "build": "2.4.0+312"
   },
   "env": {
     "platform": "flutter",
@@ -58,7 +58,7 @@
     },
     "app": {
       "id": "dev.twinsun.viper.example",
-      "build": "0.1.0+1",
+      "build": "2.4.0+312",
       "flutter_version": "3.44.0",
       "environment": "staging"
     },
@@ -71,8 +71,8 @@
       "app_open_ms": 42000
     }
   },
-  "build": "0.1.0+1",
-  "privacy_level": "standard",
+  "build": "2.4.0+312",
+  "privacy_level": "strict",
   "asset_manifest": {},
   "assets_skipped": []
 }

@@ -9,6 +9,7 @@ import 'package:viper_flutter/src/core/api.dart';
 import 'package:viper_flutter/src/core/device.dart';
 import 'package:viper_flutter/src/core/opener.dart';
 import 'package:viper_flutter/src/core/runtime.dart';
+import 'package:viper_flutter/src/core/screens.dart';
 import 'package:viper_flutter/src/core/store.dart';
 import 'package:viper_flutter/src/ui/panel_view.dart';
 
@@ -182,13 +183,16 @@ class FakeOpener implements ViperOpener {
 /// Everything a test runtime needs, and handles on each.
 class Harness {
   /// A harness answering [outcome], on [device].
-  Harness({ConfigOutcome? outcome, DeviceFacts device = iphone, MemoryStore? store, required this.view})
+  Harness({ConfigOutcome? outcome, DeviceFacts device = iphone, MemoryStore? store, this.screens, required this.view})
     : api = FakeApi(outcome ?? ConfigOk(exampleConfig())),
       store = store ?? MemoryStore(),
       device = FakeDevice(device);
 
   /// The view the runtime measures.
   final TestFlutterView view;
+
+  /// Where the person is, when a test fixes it.
+  final ScreenTracker? screens;
 
   /// The API.
   final FakeApi api;
@@ -219,6 +223,7 @@ class Harness {
     key: 'hbr_loc_9w',
     host: Uri.parse('http://localhost:4830'),
     uptime: () => const Duration(seconds: 42),
+    screens: screens,
     services: ViperServices(
       api: (_) => api,
       device: device,
@@ -273,3 +278,32 @@ extension DeviceFactsCopy on DeviceFacts {
     build: build,
   );
 }
+
+/// A screen that stays put: the route a test names, as the pick will name it from its type (D332).
+class FixedScreens extends ScreenTracker {
+  /// The person is on [route].
+  FixedScreens(this.route);
+
+  /// The screen's key.
+  final String route;
+
+  @override
+  Map<String, Object?> current({String? build}) => {
+    'route': route,
+    'url': '',
+    'title': displayName(route),
+    'build': ?build,
+  };
+}
+
+/// A phone on [build], for the review loop's after (D113).
+DeviceFacts onBuild(DeviceFacts facts, String build) => DeviceFacts(
+  os: facts.os,
+  osVersion: facts.osVersion,
+  sdkInt: facts.sdkInt,
+  model: facts.model,
+  manufacturer: facts.manufacturer,
+  physical: facts.physical,
+  appId: facts.appId,
+  build: build,
+);

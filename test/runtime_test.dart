@@ -359,7 +359,16 @@ void main() {
     });
 
     testWidgets('a silent capture of an item that exists is the screen as it is (D20, D113)', (tester) async {
-      final (h, runtime) = await started(tester);
+      // The fix's build on the item's screen: the Rails specs post this fixture as the after.
+      final (h, runtime) = await started(
+        tester,
+        harness: Harness(
+          view: tester.view,
+          device: onBuild(iphone, '2.4.0+312'),
+          screens: FixedScreens('CastHubScreen'),
+          outcome: ConfigOk(exampleConfig(privacy: 'strict')),
+        ),
+      );
       await ready(tester, h);
       h.panel!.post({
         'type': 'viper:submit',

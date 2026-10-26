@@ -2,6 +2,7 @@
 // from it, a box names what's in it, the dialog on top is a pick of its own, and the screen and
 // surface come from the navigators on screen, nested ones included.
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -272,6 +273,74 @@ void main() {
     final navigate = h.panel!.of('viper:navigate').last;
     expect((navigate['screen']! as Map)['route'], '/crew-list');
     writeFixture('LoaderToPanelMessage', 'navigate', navigate);
+  });
+
+  testWidgets('nothing under ViperPrivate leaves in a pick: not as a label, a path step or a locator (D331)', (
+    tester,
+  ) async {
+    final (h, runtime, _) = await pumpApp(
+      tester,
+      home: const Scaffold(
+        body: Column(
+          children: [
+            ViperPrivate(child: Text('4111 1111 1111 1111', key: ValueKey('card-number'))),
+            SizedBox(height: 40),
+            Card(
+              key: ValueKey('payment-card'),
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Text('Visa'),
+                    ViperPrivate(
+                      child: Tooltip(
+                        message: 'Expires 09/29',
+                        child: Text('Kalani Akana', semanticsLabel: 'Card holder Kalani Akana'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    h.panel!.post({'type': 'viper:viewer', 'staff': true});
+    const secrets = ['4111', 'Kalani', 'Akana', 'Expires', '09/29', 'holder', 'card-number', 'Card number'];
+    Future<String> pickAt(Finder target) async {
+      h.panel!.post({'type': 'viper:pick:start', 'mode': 'element'});
+      await settle(tester);
+      await tester.tapAt(tester.getCenter(target));
+      await settle(tester);
+      return jsonEncode(h.panel!.of('viper:pick:result').last);
+    }
+
+    final number = await pickAt(find.text('4111 1111 1111 1111'));
+    for (final secret in secrets) {
+      expect(number, isNot(contains(secret)), reason: secret);
+    }
+    final holder = await pickAt(find.text('Kalani Akana'));
+    for (final secret in secrets) {
+      expect(holder, isNot(contains(secret)), reason: secret);
+    }
+    expect(holder, contains('Visa'), reason: 'the card itself still says what it is');
+    // The card, stepped up to, keeps its own words and none of the private ones.
+    h.panel!.post({'type': 'viper:pick:step', 'index': 0});
+    await settle(tester);
+    final card = jsonEncode(h.panel!.of('viper:pick:result').last);
+    for (final secret in secrets) {
+      expect(card, isNot(contains(secret)), reason: secret);
+    }
+  });
+
+  testWidgets('a box is one step: nothing to step up to', (tester) async {
+    final (h, runtime, _) = await pumpApp(tester);
+    await startPick(tester, h, 'box');
+    final center = tester.getCenter(find.text('Edit cast'));
+    await tester.dragFrom(center - const Offset(60, 30), const Offset(120, 60));
+    await settle(tester);
+    expect(((h.panel!.of('viper:pick:result').single['context']! as Map)['path']! as List), hasLength(1));
   });
 
   group('screens and surfaces (D332)', () {

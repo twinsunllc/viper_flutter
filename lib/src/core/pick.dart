@@ -170,18 +170,36 @@ List<PickedStep> pathFor(Element picked, PrivacyLevel level, {int depth = 4}) {
   ];
 }
 
+/// Whether [element] is a ViperPrivate or sits under one: nothing it says leaves the phone, at
+/// any level (D331), so its label is its kind and its anchor has no words.
+bool underPrivate(Element element) {
+  if (element.widget is ViperPrivate) return true;
+  var found = false;
+  element.visitAncestorElements((ancestor) {
+    if (ancestor.widget is ViperPrivate) found = true;
+    return !found;
+  });
+  return found;
+}
+
 /// Plain words for what [element] is (W03): "Save button", "Password field", "Crew photo".
 String labelFor(Element element, PrivacyLevel level) {
   final widget = element.widget;
   final type = widget.runtimeType.toString();
   if (widget is ViperScreen) return widget.name;
   final noun = _nouns[type];
-  final semantics = level == PrivacyLevel.maximum ? null : (_dialogTitle(widget) ?? semanticsLabelOf(element));
-  final words =
-      semantics ?? _fieldLabel(element, level) ?? (noun == 'image' || noun == 'avatar' ? null : textOf(element, level));
+  final private = underPrivate(element);
+  final semantics = level == PrivacyLevel.maximum || private
+      ? null
+      : (_dialogTitle(widget) ?? semanticsLabelOf(element));
+  final words = private
+      ? null
+      : semantics ??
+            _fieldLabel(element, level) ??
+            (noun == 'image' || noun == 'avatar' ? null : textOf(element, level));
   if (noun == null) {
     final key = widget.key;
-    final keyed = key is ValueKey ? displayName('${key.value}') : null;
+    final keyed = key is ValueKey && !private ? displayName('${key.value}') : null;
     return words ?? keyed ?? displayName(type);
   }
   if (noun == 'text') return words ?? 'Text';
@@ -205,8 +223,10 @@ String? _fieldLabel(Element element, PrivacyLevel level) {
   return level == PrivacyLevel.maximum ? null : _clip(label);
 }
 
-/// The semantics label a widget gives itself: a Semantics label, a tooltip.
+/// The semantics label a widget gives itself: a Semantics label, a tooltip. Never from under a
+/// ViperPrivate (D331).
 String? semanticsLabelOf(Element element) {
+  if (underPrivate(element)) return null;
   final widget = element.widget;
   if (widget is Semantics && widget.properties.label != null) return _clip(widget.properties.label!);
   if (widget is IconButton && widget.tooltip != null) return _clip(widget.tooltip!);
@@ -215,6 +235,7 @@ String? semanticsLabelOf(Element element) {
   void visit(Element child) {
     if (found != null) return;
     final inner = child.widget;
+    if (inner is ViperPrivate) return;
     if (inner is Semantics && inner.properties.label != null && inner.properties.label!.isNotEmpty) {
       found = _clip(inner.properties.label!);
       return;
@@ -234,7 +255,7 @@ String? semanticsLabelOf(Element element) {
 /// The words a widget shows, masked as the level says: none at Maximum, and none from a field
 /// above Standard (what someone typed).
 String? textOf(Element element, PrivacyLevel level) {
-  if (level == PrivacyLevel.maximum) return null;
+  if (level == PrivacyLevel.maximum || underPrivate(element)) return null;
   final parts = <String>[];
   void visit(Element child) {
     if (parts.join(' ').length > 60) return;
@@ -281,7 +302,8 @@ Map<String, Object?> anchorFor(Element element, PrivacyLevel level, {Map<String,
   return {
     'locators': {
       'widget': widget.runtimeType.toString(),
-      if (key is ValueKey && key.value != null) 'key': '${key.value}',
+      // A key can carry the app's data (a ValueKey of an email): none from under ViperPrivate.
+      if (key is ValueKey && key.value != null && !underPrivate(element)) 'key': '${key.value}',
       'semantics': ?semantics,
       'text': ?text,
       'position': ?position,

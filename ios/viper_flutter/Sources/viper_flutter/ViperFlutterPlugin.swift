@@ -35,11 +35,36 @@ enum Screenshot {
     return scenes.flatMap { $0.windows }.first(where: { $0.isKeyWindow }) ?? scenes.first?.windows.first
   }
 
+  /// The FlutterViewController's view, wherever it sits in the window.
+  static func flutterView(in window: UIWindow) -> UIView? {
+    var queue: [UIViewController] = window.rootViewController.map { [$0] } ?? []
+    while !queue.isEmpty {
+      let controller = queue.removeFirst()
+      if controller is FlutterViewController { return controller.view }
+      queue.append(contentsOf: controller.children)
+      if let presented = controller.presentedViewController { queue.append(presented) }
+    }
+    return nil
+  }
+
   static func take(_ args: [String: Any]) -> Any {
     guard let window = keyWindow() else {
       return FlutterError(code: "no_window", message: "No window to draw", details: nil)
     }
-    let boxes = (args["boxes"] as? [[Double]]) ?? []
+    // Masking guards privacy, so a box list that doesn't read is an error, never "no masks".
+    guard let raw = args["boxes"] as? [Any] else {
+      return FlutterError(code: "bad_boxes", message: "The mask boxes didn't read", details: nil)
+    }
+    var boxes: [[Double]] = []
+    for item in raw {
+      guard let box = item as? [NSNumber], box.count == 4 else {
+        return FlutterError(code: "bad_boxes", message: "A mask box didn't read", details: nil)
+      }
+      boxes.append(box.map { $0.doubleValue })
+    }
+    // Dart measures boxes in the FlutterView; the picture is the window. They're the same in an
+    // app Flutter fills, and the offset covers one that embeds Flutter in a part of the window.
+    let flutterOrigin = flutterView(in: window)?.convert(CGPoint.zero, to: window) ?? .zero
     let thumbWidth = (args["thumb_width"] as? Double) ?? 360
     let format = UIGraphicsImageRendererFormat()
     format.scale = window.screen.scale
@@ -60,8 +85,9 @@ enum Screenshot {
     let masked = renderer.image { ctx in
       image.draw(at: .zero)
       fill.setFill()
-      for box in boxes where box.count == 4 {
-        UIBezierPath(roundedRect: CGRect(x: box[0], y: box[1], width: box[2], height: box[3]), cornerRadius: 3).fill()
+      for box in boxes {
+        let rect = CGRect(x: box[0] + flutterOrigin.x, y: box[1] + flutterOrigin.y, width: box[2], height: box[3])
+        UIBezierPath(roundedRect: rect, cornerRadius: 3).fill()
       }
       _ = ctx
     }

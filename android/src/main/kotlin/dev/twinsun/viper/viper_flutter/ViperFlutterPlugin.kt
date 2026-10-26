@@ -67,10 +67,24 @@ class ViperFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activ
           result.error("no_window", "No activity to copy", null)
           return
         }
-        Screenshot(current, call, result).take()
+        // Masking guards privacy, so a box list that doesn't read is an error, never "no masks".
+        val boxes = readBoxes(call.argument<Any>("boxes"))
+        if (boxes == null) {
+          result.error("bad_boxes", "The mask boxes didn't read", null)
+          return
+        }
+        Screenshot(current, boxes, call, result).take()
       }
       "timezone" -> result.success(TimeZone.getDefault().id)
       else -> result.notImplemented()
+    }
+  }
+
+  private fun readBoxes(raw: Any?): List<List<Double>>? {
+    if (raw !is List<*>) return null
+    return raw.map { box ->
+      if (box !is List<*> || box.size != 4 || box.any { it !is Number }) return null
+      box.map { (it as Number).toDouble() }
     }
   }
 }
@@ -83,8 +97,12 @@ class ViperFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activ
  * honored, not left to the copy failing (it doesn't). The picture is the FlutterView's area, and
  * the mask boxes are filled before the PNG is encoded (D331).
  */
-private class Screenshot(private val activity: Activity, call: MethodCall, private val result: MethodChannel.Result) {
-  private val boxes: List<List<Double>> = (call.argument<List<List<Number>>>("boxes") ?: emptyList()).map { box -> box.map { it.toDouble() } }
+private class Screenshot(
+  private val activity: Activity,
+  private val boxes: List<List<Double>>,
+  call: MethodCall,
+  private val result: MethodChannel.Result,
+) {
   private val thumbWidth: Double = call.argument<Number>("thumb_width")?.toDouble() ?: 360.0
   private val main = Handler(Looper.getMainLooper())
   private val started = SystemClock.elapsedRealtime()
@@ -140,7 +158,6 @@ private class Screenshot(private val activity: Activity, call: MethodCall, priva
         val paint = Paint().apply { color = 0xFFD2D5DA.toInt(); isAntiAlias = true }
         val radius = (3 * density).toFloat()
         for (box in boxes) {
-          if (box.size != 4) continue
           val rect = RectF((box[0] * density).toFloat(), (box[1] * density).toFloat(), ((box[0] + box[2]) * density).toFloat(), ((box[1] + box[3]) * density).toFloat())
           canvas.drawRoundRect(rect, radius, radius, paint)
         }

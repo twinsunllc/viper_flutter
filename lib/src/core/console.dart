@@ -90,5 +90,7 @@ class ConsoleCapture {
     if (identical(HttpOverrides.current, _ourHttp)) HttpOverrides.global = _previousHttp;
     unawaited(_records?.cancel());
     _records = null;
+    // Nothing is kept once Viper says no; clients made meanwhile log into nothing.
+    log.stop();
   }
 }

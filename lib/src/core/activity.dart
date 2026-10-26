@@ -5,7 +5,7 @@ import 'dart:convert';
 
 import 'package:viper_flutter/src/core/mask.dart';
 
-/// How many lines and calls are kept.
+/// How many console lines are kept.
 const int maxConsoleLines = 200;
 
 /// How many calls are kept.
@@ -76,6 +76,16 @@ class ActivityLog {
   final List<ConsoleLine> _console = <ConsoleLine>[];
   final List<NetworkCall> _network = <NetworkCall>[];
 
+  /// Off once Viper turns out not to run: nothing more is kept (D82, D338).
+  bool enabled = true;
+
+  /// Forgets everything and keeps nothing more.
+  void stop() {
+    enabled = false;
+    _console.clear();
+    _network.clear();
+  }
+
   /// The lines kept, oldest first.
   List<ConsoleLine> get console => List.unmodifiable(_console);
 
@@ -84,6 +94,7 @@ class ActivityLog {
 
   /// Keeps a console line.
   void log(String level, String text) {
+    if (!enabled) return;
     _console.add(ConsoleLine(level, _clock(), text.length > maxConsoleText ? text.substring(0, maxConsoleText) : text));
     if (_console.length > maxConsoleLines) _console.removeRange(0, _console.length - maxConsoleLines);
   }
@@ -91,6 +102,7 @@ class ActivityLog {
   /// Starts a call; finish it by setting its status, duration or error.
   NetworkCall start(String method, Uri url) {
     final call = NetworkCall(method: method.toUpperCase(), url: url, started: _clock());
+    if (!enabled) return call;
     _network.add(call);
     if (_network.length > maxNetworkCalls) _network.removeRange(0, _network.length - maxNetworkCalls);
     return call;

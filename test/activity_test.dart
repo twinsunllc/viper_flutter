@@ -105,6 +105,11 @@ void main() {
       expect(log.console.first.text, startsWith('Bad state: layout\n'));
 
       capture.release();
+      expect(log.console, isEmpty, reason: 'nothing is kept once Viper says no');
+      capture.printed('after');
+      log.start('GET', Uri.parse('https://api.example.com/after')).status = 200;
+      expect(log.console, isEmpty);
+      expect(log.network, isEmpty);
       expect(identical(FlutterError.onError, app), isTrue);
       expect(identical(PlatformDispatcher.instance.onError, appPlatform), isTrue);
       expect(HttpOverrides.current, isNull);

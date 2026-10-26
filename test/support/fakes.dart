@@ -214,7 +214,11 @@ class FakePanelView implements PanelView {
   Future<void> reload() async => reloads++;
 
   @override
-  Widget build(BuildContext context) => const ColoredBox(color: Color(0xFFFFFFFF), child: SizedBox.expand());
+  Widget build(BuildContext context) =>
+      const ColoredBox(key: webViewKey, color: Color(0xFFFFFFFF), child: SizedBox.expand());
+
+  /// The stand-in web view, for tests to measure.
+  static const ValueKey<String> webViewKey = ValueKey<String>('fake-web-view');
 }
 
 /// The message inside `window.viperReceive && window.viperReceive(<json>);`.

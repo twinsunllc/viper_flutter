@@ -1,5 +1,6 @@
 // The sheet the panel lives in (D169's phone layout, W13): up from the bottom, below the top
-// safe area, rising with the keyboard. The web view inside is made once and kept; until the panel
+// safe area, rising with the keyboard, and keeping the panel's footer clear of the home indicator
+// or gesture bar. The web view inside is made once and kept; until the panel
 // says viper:ready the sheet shows a skeleton in the panel's layout, never a blank view (D44).
 import 'dart:async';
 
@@ -20,6 +21,9 @@ double sheetHeight({required double height, required double top, required double
 class ViperSheet extends StatefulWidget {
   /// The sheet for [runtime].
   const ViperSheet({required this.runtime, super.key});
+
+  /// The strip in the sheet's color below the web view, over the home indicator or gesture bar.
+  static const ValueKey<String> bottomStripKey = ValueKey<String>('viper-sheet-bottom-strip');
 
   /// Viper running.
   final ViperRuntime runtime;
@@ -79,6 +83,10 @@ class _ViperSheetState extends State<ViperSheet> with SingleTickerProviderStateM
     final media = MediaQuery.of(context);
     final keyboard = media.viewInsets.bottom;
     final height = sheetHeight(height: media.size.height, top: media.padding.top, keyboard: keyboard);
+    // The sheet runs to the bottom edge, but the web view stops above the home indicator or
+    // gesture bar, so the panel's footer buttons never sit under it. With the keyboard up the
+    // sheet sits on the keyboard and needs no strip.
+    final strip = keyboard > 0 ? 0.0 : media.padding.bottom;
     final palette = runtime.palette;
     return AnimatedBuilder(
       animation: _shown,
@@ -129,6 +137,7 @@ class _ViperSheetState extends State<ViperSheet> with SingleTickerProviderStateM
                   ],
                 ),
               ),
+              if (strip > 0) SizedBox(key: ViperSheet.bottomStripKey, height: strip),
             ],
           ),
         ),

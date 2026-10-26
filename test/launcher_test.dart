@@ -91,6 +91,24 @@ void main() {
     expect(tester.getRect(sheet).top, greaterThanOrEqualTo(59));
   });
 
+  testWidgets("the panel's footer stays above the home indicator; with the keyboard up, no strip", (tester) async {
+    final (_, runtime) = await pumpApp(tester);
+    runtime.openSheet();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    final sheet = find.byType(ViperSheet);
+    final web = find.byKey(FakePanelView.webViewKey);
+    // 102 physical pixels at 3x: a 34-point home indicator.
+    expect(tester.getRect(sheet).bottom, 852, reason: 'the sheet still runs to the edge');
+    expect(tester.getRect(web).bottom, 852 - 34, reason: 'the web view stops above the indicator');
+    expect(tester.getSize(find.byKey(ViperSheet.bottomStripKey)).height, 34);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 336 * 3);
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(ViperSheet.bottomStripKey), findsNothing);
+    expect(tester.getRect(web).bottom, 852 - 336, reason: 'on the keyboard, the web view reaches the sheet bottom');
+  });
+
   testWidgets('a drag snaps to the nearest spot and is remembered per install (D169, D335)', (tester) async {
     final store = MemoryStore();
     final (_, runtime) = await pumpApp(tester, store: store);

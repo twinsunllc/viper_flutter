@@ -8,7 +8,7 @@ already ships, in a web view (D328); this package plays the loader's part.
 Built in the Viper repo (`flutter/viper_flutter`) and published to `twinsunllc/viper_flutter`,
 which apps use as a git dependency (D339).
 
-**Status:** slice 3 of 6. The launcher, the panel in its sheet, the bridge, and the phone's
+**Status:** slice 4 of 6. The launcher, the panel in its sheet, the bridge, and the phone's
 masked screenshot uploaded with the report work. While picking, the sheet is a handle offering the
 whole screen; tapping an element, the full masking tests, console and network, shake and identity
 refresh come in the next slices.
@@ -110,6 +110,41 @@ tool/check_artifact.sh build/ios/iphoneos/Runner.app/Frameworks/App.framework ex
 It takes a `libapp.so`, an `App.framework`, or an `.apk`, `.aab` or `.ipa`, needs a release or
 profile build (a debug build has no snapshot), and never prints the host or the key. CI runs both
 directions on the example's Android release builds.
+
+## Console and network (D333)
+
+A report carries the last 200 console lines and 100 network calls, as on the web:
+
+- **Console:** what the app prints (`print`, `debugPrint`) inside `Viper.runZoned`; errors from
+  `FlutterError.onError` and `PlatformDispatcher.onError`, chained to what the app set, so
+  Crashlytics keeps working; whatever the app's own zone handler passes to `Viper.recordError`;
+  and `package:logging` records, heard without changing the app's level.
+- **Network:** every `dart:io` `HttpClient` call (including `package:http` and Dio on mobile):
+  method, origin and path, status, duration and a request id header (`x-request-id` and the
+  like). Never a body. It doesn't see web sockets or native SDKs' own traffic.
+- At Strict and Maximum, console text is masked and queries are stripped (D80).
+
+Viper wraps the `HttpOverrides` current when `Viper.start` runs, which is why `onBoot` comes before
+the app builds its clients. An override the app installs later (certificate pinning) must chain to
+the one before it:
+
+```dart
+class PinnedOverrides extends HttpOverrides {
+  PinnedOverrides({this.previous});
+  final HttpOverrides? previous;
+
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    final client = previous?.createHttpClient(context) ?? super.createHttpClient(context);
+    client.badCertificateCallback = (cert, host, port) => pinned(cert, host);
+    return client;
+  }
+}
+
+HttpOverrides.global = PinnedOverrides(previous: HttpOverrides.current);
+```
+
+Pinning still applies through Viper's wrapper: it forwards every property to the client it wraps.
 
 ## The launcher (D335)
 

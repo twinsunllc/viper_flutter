@@ -1,0 +1,40 @@
+{
+  "key": "hbr_loc_9w",
+  "platform": "flutter",
+  "screen": { "route": "CastHubScreen", "url": "", "title": "Cast hub", "build": "2.4.0+312" },
+  "scope": "screen",
+  "body": "",
+  "privacy_level": "strict",
+  "moment": "fix_landed",
+  "item_id": "6f1d2c3b-4a5e-4f60-8b7a-9c0d1e2f3a4b",
+  "env": {
+    "platform": "flutter",
+    "device": { "model": "iPhone 16", "manufacturer": "Apple", "physical": true, "tablet": false },
+    "os": { "name": "iOS", "version": "26.1" },
+    "screen": {
+      "logical": { "width": 393, "height": 852 },
+      "device_pixel_ratio": 3,
+      "orientation": "portrait",
+      "padding": { "top": 59, "bottom": 34, "left": 0, "right": 0 },
+      "keyboard_open": false
+    },
+    "preferences": {
+      "brightness": "light",
+      "text_scale": 1.0,
+      "bold_text": false,
+      "reduced_motion": false,
+      "high_contrast": false,
+      "screen_reader": false,
+      "locale": "en-US",
+      "locales": ["en-US"],
+      "timezone": "America/Chicago"
+    },
+    "connection": { "type": "wifi", "online": true },
+    "app": { "id": "dev.twinsun.viper.example", "build": "2.4.0+312" },
+    "screenshot": { "method": "none", "platform_views_blocked": false, "blocked": "failed" },
+    "time": { "captured_at": "2026-10-25T21:02:00Z", "app_open_ms": 9000 }
+  },
+  "build": "2.4.0+312",
+  "asset_manifest": {},
+  "assets_skipped": []
+}

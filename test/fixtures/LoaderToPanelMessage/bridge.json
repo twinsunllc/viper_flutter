@@ -1,0 +1,1 @@
+{ "type": "viper:bridge", "platform": "flutter", "app_id": "dev.twinsun.viper.example", "os": "iOS", "shake": true, "text_scale": 1.3 }

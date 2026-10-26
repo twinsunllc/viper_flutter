@@ -1,0 +1,27 @@
+{
+  "platform": "flutter",
+  "device": { "model": "iPhone 16", "manufacturer": "Apple", "physical": true, "tablet": false },
+  "os": { "name": "iOS", "version": "26.1" },
+  "screen": {
+    "logical": { "width": 393, "height": 852 },
+    "device_pixel_ratio": 3,
+    "orientation": "portrait",
+    "padding": { "top": 59, "bottom": 34, "left": 0, "right": 0 },
+    "keyboard_open": false
+  },
+  "preferences": {
+    "brightness": "light",
+    "text_scale": 1.0,
+    "bold_text": false,
+    "reduced_motion": false,
+    "high_contrast": false,
+    "screen_reader": false,
+    "locale": "en-US",
+    "locales": ["en-US"],
+    "timezone": "America/Los_Angeles"
+  },
+  "connection": { "type": "wifi", "online": true },
+  "app": { "id": "dev.twinsun.viper.example", "build": "2.4.0+311", "flutter_version": "3.44.0", "environment": "staging" },
+  "screenshot": { "method": "native", "platform_views_blocked": false },
+  "time": { "captured_at": "2026-10-25T20:14:00Z", "app_open_ms": 182000 }
+}

@@ -187,6 +187,19 @@ void main() {
     expect(h.native.captures.last.any((box) => box.overlaps(tester.getRect(field).deflate(1))), isTrue);
   });
 
+  testWidgets('the native copy waits for the hidden frame to reach the screen, not just Dart', (tester) async {
+    final (h, runtime) = await pumpApp(tester);
+    unawaited(runtime.takeShot());
+    await tester.pump();
+    await tester.pump();
+    expect(runtime.capturing, isTrue);
+    expect(h.native.captures, isEmpty, reason: 'the frame before may still be on screen, with Viper on it');
+    await tester.pump(ViperRuntime.presentWait);
+    await tester.pump();
+    expect(h.native.captures, hasLength(1));
+    await settle(tester);
+  });
+
   testWidgets('two shots at once are one: Viper stays hidden until it is taken', (tester) async {
     final (h, runtime) = await pumpApp(tester);
     final first = runtime.takeShot();

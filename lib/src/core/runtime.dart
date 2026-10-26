@@ -909,6 +909,9 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
 
   Future<Shot>? _shooting;
 
+  /// How long a frame takes from Dart to the screen, at most, before the native copy reads it.
+  static const Duration presentWait = Duration(milliseconds: 50);
+
   Future<Shot> _shoot() async {
     final level = PrivacyLevel.parse((config?['project'] as Map?)?['privacy_level']);
     if (appKey.currentContext == null) return const Shot.none(ScreenshotInfo.none(blocked: 'failed'));
@@ -917,8 +920,12 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     notifyListeners();
     try {
       // The frame without Viper on it has to reach the screen before the native side draws it.
+      // endOfFrame is only Dart's side of a frame; the raster thread draws and presents it after,
+      // and the engine tells Dart nothing when it's on screen. Without the wait a pick's picture
+      // had the pick handle in it, from the frame before.
       await SchedulerBinding.instance.endOfFrame;
       await SchedulerBinding.instance.endOfFrame;
+      await Future<void>.delayed(presentWait);
       final root = appKey.currentContext as Element?;
       if (root == null) return const Shot.none(ScreenshotInfo.none(blocked: 'failed'));
       // The boxes from the frame the native side copies, so a scroll or an animation can't move a

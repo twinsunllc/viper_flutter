@@ -9,6 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:viper_flutter/markers.dart';
 import 'package:viper_flutter/src/core/api.dart';
 import 'package:viper_flutter/src/core/device.dart';
+import 'package:viper_flutter/src/core/mask.dart';
+import 'package:viper_flutter/src/core/pick.dart';
 import 'package:viper_flutter/src/core/runtime.dart';
 import 'package:viper_flutter/src/core/screens.dart';
 import 'package:viper_flutter/src/ui/host.dart';
@@ -521,5 +523,27 @@ void main() {
       expect(screens.currentSurface(), containsPair('name', 'Bottom sheet'));
       expect(screens.currentSurface(), containsPair('kind', 'other'));
     });
+  });
+
+  testWidgets("a row's icons are no words in its label: no box for the chevron", (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Material(
+          child: Column(
+            children: [
+              ListTile(
+                leading: CircleAvatar(child: Text('3')),
+                title: Text('Job 3: Waimanalo beach'),
+                trailing: Icon(Icons.chevron_right),
+              ),
+              // An icon font drawn through plain Text, as some icon packages do.
+              Text('Call time 8:00 a.m. \u{E5CC}', key: ValueKey('glyph')),
+            ],
+          ),
+        ),
+      ),
+    );
+    expect(textOf(tester.element(find.byType(ListTile)), PrivacyLevel.standard), '3 Job 3: Waimanalo beach');
+    expect(textOf(tester.element(find.byKey(const ValueKey('glyph'))), PrivacyLevel.standard), 'Call time 8:00 a.m.');
   });
 }

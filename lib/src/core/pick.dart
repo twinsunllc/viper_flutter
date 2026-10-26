@@ -262,8 +262,10 @@ String? textOf(Element element, PrivacyLevel level) {
     final widget = child.widget;
     if (widget is ViperPrivate) return;
     if (widget is EditableText) return;
+    // An icon is a glyph in a font, not words: a chevron would come out as a box.
+    if (widget is Icon) return;
     if (widget is RichText) {
-      final text = widget.text.toPlainText().trim();
+      final text = widget.text.toPlainText().replaceAll(_privateUse, '').trim();
       if (text.isNotEmpty) parts.add(text);
       return;
     }
@@ -274,6 +276,9 @@ String? textOf(Element element, PrivacyLevel level) {
   if (parts.isEmpty) return null;
   return _clip(parts.join(' '));
 }
+
+/// Icon fonts put their glyphs in Unicode's private use areas, which have no words in them.
+final RegExp _privateUse = RegExp(r'[\u{E000}-\u{F8FF}\u{F0000}-\u{FFFFD}\u{100000}-\u{10FFFD}]', unicode: true);
 
 String _clip(String text) {
   final one = text.replaceAll(RegExp(r'\s+'), ' ').trim();

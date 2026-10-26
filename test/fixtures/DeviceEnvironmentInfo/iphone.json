@@ -37,7 +37,7 @@
       "en-US",
       "zh-CN"
     ],
-    "timezone": "Pacific/Honolulu"
+    "timezone": "America/Los_Angeles"
   },
   "connection": {
     "type": "wifi",
@@ -45,19 +45,16 @@
   },
   "app": {
     "id": "dev.twinsun.viper.example",
-    "build": "0.1.0+1",
+    "build": "2.4.0+311",
     "flutter_version": "3.44.0",
-    "environment": "staging",
-    "context": {
-      "plan": "pro"
-    }
+    "environment": "staging"
   },
   "screenshot": {
-    "method": "none",
+    "method": "native",
     "platform_views_blocked": false
   },
   "time": {
     "captured_at": "2026-10-26T19:00:00.000Z",
-    "app_open_ms": 42000
+    "app_open_ms": 182000
   }
 }

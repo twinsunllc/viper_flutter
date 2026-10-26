@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:viper_flutter/src/core/api.dart';
+import 'package:viper_flutter/src/core/environment.dart';
 import 'package:viper_flutter/src/core/runtime.dart';
 import 'package:viper_flutter/src/core/store.dart';
 
@@ -355,6 +356,24 @@ void main() {
       ]);
       writeFixture('LoaderToPanelMessage', 'report', report);
       writeFixture('ReportPayload', 'whole_screen', payload);
+    });
+
+    testWidgets('the device environment of a capture taken natively on an iPhone (D27, D338)', (tester) async {
+      phone(tester);
+      // The capture the Rails portal specs show: build 2.4.0+311, the picture taken on the phone, a
+      // tester on the mainland.
+      final env = deviceEnvironment(
+        facts: onBuild(iphone, '2.4.0+311'),
+        view: tester.view,
+        connection: 'wifi',
+        screenshot: const ScreenshotInfo(method: 'native'),
+        capturedAt: Harness.now,
+        appOpen: const Duration(minutes: 3, seconds: 2),
+        timezone: 'America/Los_Angeles',
+        app: const AppDetails(environment: 'staging'),
+      );
+      expect(env['screenshot'], {'method': 'native', 'platform_views_blocked': false});
+      expect((env['app']! as Map)['build'], '2.4.0+311');
       writeFixture('DeviceEnvironmentInfo', 'iphone', env);
     });
 

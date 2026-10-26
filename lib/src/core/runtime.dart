@@ -259,24 +259,24 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     if (phase == ViperPhase.off || phase == ViperPhase.ready || _asking) return;
     _asking = true;
     _attempts++;
-    final ConfigOutcome outcome;
     try {
-      outcome = await _api!.config();
+      final outcome = await _api!.config();
+      if (phase == ViperPhase.off || phase == ViperPhase.ready) return;
+      switch (outcome) {
+        case ConfigOk(:final config):
+          // Still asking until the panel is made, so nothing starts a second one meanwhile.
+          await _start(config);
+        case ConfigRefused(:final reason):
+          refusal = reason;
+          services.log('Viper refused this app ($reason); nothing is captured');
+          _setPhase(ViperPhase.refused);
+        case ConfigUnreachable(:final message):
+          services.log('Viper could not be reached ($message); trying again');
+          _setPhase(ViperPhase.unreachable);
+          _scheduleRetry();
+      }
     } finally {
       _asking = false;
-    }
-    if (phase == ViperPhase.off || phase == ViperPhase.ready) return;
-    switch (outcome) {
-      case ConfigOk(:final config):
-        await _start(config);
-      case ConfigRefused(:final reason):
-        refusal = reason;
-        services.log('Viper refused this app ($reason); nothing is captured');
-        _setPhase(ViperPhase.refused);
-      case ConfigUnreachable(:final message):
-        services.log('Viper could not be reached ($message); trying again');
-        _setPhase(ViperPhase.unreachable);
-        _scheduleRetry();
     }
   }
 

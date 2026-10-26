@@ -32,7 +32,7 @@ class _ViperSheetState extends State<ViperSheet> with SingleTickerProviderStateM
   late final AnimationController _shown = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 260),
-    value: widget.runtime.sheetOpen ? 1 : 0,
+    value: widget.runtime.sheetShown ? 1 : 0,
   );
 
   @override
@@ -49,7 +49,7 @@ class _ViperSheetState extends State<ViperSheet> with SingleTickerProviderStateM
 
   void _follow() {
     final reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final open = widget.runtime.sheetOpen;
+    final open = widget.runtime.sheetShown;
     if (open && _shown.value < 1) {
       if (reduced) {
         _shown.value = 1;
@@ -83,7 +83,7 @@ class _ViperSheetState extends State<ViperSheet> with SingleTickerProviderStateM
     return AnimatedBuilder(
       animation: _shown,
       builder: (context, child) {
-        final hidden = _shown.value == 0 && !runtime.sheetOpen;
+        final hidden = _shown.value == 0 && !runtime.sheetShown;
         final offset = (1 - Curves.easeOutCubic.transform(_shown.value)) * (height + 24);
         return Positioned(
           left: 0,

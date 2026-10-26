@@ -60,13 +60,10 @@
         "id": "dev.twinsun.viper.example",
         "build": "0.1.0+1",
         "flutter_version": "3.44.0",
-        "environment": "staging",
-        "context": {
-          "plan": "pro"
-        }
+        "environment": "staging"
       },
       "screenshot": {
-        "method": "none",
+        "method": "native",
         "platform_views_blocked": false
       },
       "time": {
@@ -77,7 +74,8 @@
     "build": "0.1.0+1",
     "privacy_level": "standard",
     "asset_manifest": {},
-    "assets_skipped": []
+    "assets_skipped": [],
+    "device_picture": "pic-1"
   },
   "files": [
     {

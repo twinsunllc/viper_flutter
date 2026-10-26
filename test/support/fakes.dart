@@ -2,10 +2,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:viper_flutter/src/core/api.dart';
+import 'package:viper_flutter/src/core/camera.dart';
 import 'package:viper_flutter/src/core/device.dart';
 import 'package:viper_flutter/src/core/opener.dart';
 import 'package:viper_flutter/src/core/runtime.dart';
@@ -90,8 +92,55 @@ class FakeApi implements ViperApi {
     return outcome;
   }
 
+  /// What picture uploads answer, in turn; the last one repeats.
+  List<PictureOutcome> pictures = [PictureStored('pic-1', DateTime.utc(2026, 10, 26, 20))];
+
+  /// The pictures uploaded.
+  final List<List<int>> uploads = [];
+
+  @override
+  Future<PictureOutcome> uploadPicture(List<int> png) async {
+    uploads.add(png);
+    return pictures.length > 1 ? pictures.removeAt(0) : pictures.single;
+  }
+
   @override
   void close() {}
+}
+
+/// A [ViperNative] that answers what it's given, and records the boxes it was asked to fill.
+class FakeNative implements ViperNative {
+  /// Answers [answer].
+  FakeNative([NativeAnswer? answer])
+    : answer =
+          answer ??
+          NativePicture(
+            png: Uint8List.fromList(const [137, 80, 78, 71, 1, 2, 3]),
+            thumb: Uint8List.fromList(const [255, 216, 255]),
+            drawMs: 7,
+          );
+
+  /// What capture answers.
+  NativeAnswer answer;
+
+  /// The boxes each capture was asked to fill.
+  final List<List<Rect>> captures = [];
+
+  /// Whether Viper's own UI was hidden when each capture ran.
+  final List<bool> hidden = [];
+
+  /// The runtime, to see whether its UI was hidden.
+  ViperRuntime? runtime;
+
+  @override
+  Future<NativeAnswer> capture(List<Rect> boxes, {double thumbWidth = 360}) async {
+    captures.add(boxes);
+    hidden.add(runtime?.capturing ?? false);
+    return answer;
+  }
+
+  @override
+  Future<String?> timezone() async => 'Pacific/Honolulu';
 }
 
 /// A [ViperDevice] with fixed facts.
@@ -206,6 +255,9 @@ class Harness {
   /// The opener.
   final FakeOpener opener = FakeOpener();
 
+  /// The plugin.
+  final FakeNative native = FakeNative();
+
   /// The log.
   final List<String> log = [];
 
@@ -219,7 +271,7 @@ class Harness {
   static final DateTime now = DateTime.utc(2026, 10, 26, 19);
 
   /// The runtime for key `hbr_loc_9w` on the local Viper.
-  ViperRuntime runtime() => ViperRuntime(
+  ViperRuntime runtime() => native.runtime = ViperRuntime(
     key: 'hbr_loc_9w',
     host: Uri.parse('http://localhost:4830'),
     uptime: () => const Duration(seconds: 42),
@@ -233,6 +285,7 @@ class Harness {
       log: log.add,
       view: () => view,
       timezone: (_) => 'Pacific/Honolulu',
+      native: native,
       panelView: ({required base, required onMessage, required onExternal, required onLoadError, required background}) {
         panelsMade++;
         return panel = FakePanelView(base, onMessage);

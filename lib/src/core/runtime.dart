@@ -5,11 +5,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
+import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:viper_flutter/src/core/api.dart';
+import 'package:viper_flutter/src/core/camera.dart';
 import 'package:viper_flutter/src/core/device.dart';
 import 'package:viper_flutter/src/core/environment.dart';
+import 'package:viper_flutter/src/core/mask.dart';
 import 'package:viper_flutter/src/core/opener.dart';
 import 'package:viper_flutter/src/core/placement.dart';
 import 'package:viper_flutter/src/core/screens.dart';
@@ -58,7 +61,9 @@ class ViperServices {
     ViperLog? log,
     ui.FlutterView Function()? view,
     String Function(DateTime now)? timezone,
+    ViperNative? native,
   }) : device = device ?? PluginDevice(),
+       native = native ?? const ChannelNative(),
        store = store ?? PreferencesStore(),
        panelView = panelView ?? webPanelView,
        opener = opener ?? const LauncherOpener(),
@@ -69,7 +74,7 @@ class ViperServices {
            (() =>
                WidgetsBinding.instance.platformDispatcher.implicitView ??
                WidgetsBinding.instance.platformDispatcher.views.first),
-       timezone = timezone ?? dartTimezone,
+       _timezone = timezone,
        _api = api;
 
   final ViperApi Function(DeviceFacts facts)? _api;
@@ -95,8 +100,16 @@ class ViperServices {
   /// The app's view.
   final ui.FlutterView Function() view;
 
-  /// The phone's time zone.
-  final String Function(DateTime now) timezone;
+  final String Function(DateTime now)? _timezone;
+
+  /// The plugin's native calls: the screenshot and the time zone (D338).
+  final ViperNative native;
+
+  /// The phone's IANA time zone, once the plugin has said it.
+  String? nativeTimezone;
+
+  /// The phone's time zone: what a test fixed, else the plugin's, else Dart's own guess.
+  String timezone(DateTime now) => _timezone?.call(now) ?? nativeTimezone ?? dartTimezone(now);
 
   /// The API for an app, once its ID is known.
   ViperApi api(Uri host, String key, DeviceFacts facts) =>
@@ -171,6 +184,12 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   /// The sheet is up.
   bool sheetOpen = false;
 
+  /// A pick is under way: the sheet is down to its handle (D169).
+  bool picking = false;
+
+  /// The sheet shows: open, and not down to its handle for a pick.
+  bool get sheetShown => sheetOpen && !picking;
+
   /// The viewer is staff (viper:viewer).
   bool staff = false;
 
@@ -191,6 +210,17 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
 
   /// Whether a shake can bring Viper back, so hiding is offered (D335).
   bool shakeAvailable = false;
+
+  /// Holds the app's RepaintBoundary, for the walk the mask boxes come from and Flutter's own
+  /// picture when the native one fails.
+  final GlobalKey appKey = GlobalKey(debugLabel: 'viper app boundary');
+
+  /// Viper's own launcher and sheet are hidden for the frame the shot is taken (D331).
+  bool capturing = false;
+
+  Shot? _pickShot;
+  Future<Shot>? _pickShotTaking;
+  final Map<String, _Attempt> _tries = <String, _Attempt>{};
 
   /// A short note on screen, such as how to bring a hidden Viper back.
   String? toast;
@@ -236,6 +266,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
       _setPhase(ViperPhase.unsupported);
       return;
     }
+    unawaited(services.native.timezone().then((zone) => services.nativeTimezone = zone));
     theme = await services.store.read(_themeKey) ?? 'system';
     final kept = await services.store.readJson(_stateKey);
     if (kept != null) panelState = kept;
@@ -367,6 +398,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   void closeSheet() {
     if (!sheetOpen) return;
     sheetOpen = false;
+    picking = false;
     _tapAt = null;
     notifyListeners();
   }
@@ -602,23 +634,140 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
         'mode': 'screen',
       };
       send({'type': 'viper:pick:none', 'scope': 'screen', 'label': 'Whole screen', 'context': context});
+      unawaited(_shootForPick());
       return;
     }
+    // The element, box and dialog picks come in slice 5; until then the handle offers the whole
+    // screen, or going back.
+    picking = true;
+    notifyListeners();
+  }
+
+  /// The handle's Whole screen: the pick is the screen (W03's edge choices).
+  void pickWholeScreen() {
+    if (!picking) return;
+    picking = false;
+    notifyListeners();
+    _startPick('screen');
+  }
+
+  /// The handle's Cancel, or Android's back while picking: back to the panel.
+  void cancelPick() {
+    if (!picking) return;
+    picking = false;
+    notifyListeners();
     send({'type': 'viper:pick:cancel'});
+  }
+
+  /// The pick's picture, taken at once so the composer shows it (W21); the report uses it.
+  Future<void> _shootForPick() async {
+    _pickShot = null;
+    send({'type': 'viper:screenshot', 'status': 'taking'});
+    final taking = takeShot();
+    _pickShotTaking = taking;
+    final shot = await taking;
+    if (_pickShotTaking != taking) return;
+    _pickShot = shot;
+    final url = shot.thumbDataUrl;
+    send(
+      url == null
+          ? {'type': 'viper:screenshot', 'status': 'failed'}
+          : {'type': 'viper:screenshot', 'status': 'ready', 'data_url': url},
+    );
+  }
+
+  /// The masked picture of the app (D330, D331, D338): Viper's own UI hidden for the frame, the
+  /// native picture first, Flutter's toImage when that fails, none on a secure window.
+  Future<Shot> takeShot() async {
+    final root = appKey.currentContext as Element?;
+    final level = PrivacyLevel.parse((config?['project'] as Map?)?['privacy_level']);
+    if (root == null) return const Shot.none(ScreenshotInfo.none(blocked: 'failed'));
+    final watch = Stopwatch()..start();
+    final boxes = maskBoxes(root, level);
+    capturing = true;
+    notifyListeners();
+    try {
+      // The frame without Viper on it has to reach the screen before the native side draws it.
+      await SchedulerBinding.instance.endOfFrame;
+      await SchedulerBinding.instance.endOfFrame;
+      final answer = await services.native.capture(boxes);
+      switch (answer) {
+        case NativePicture(:final png, :final thumb):
+          return Shot(
+            png: png,
+            thumb: thumb,
+            thumbType: 'image/jpeg',
+            info: const ScreenshotInfo(method: 'native'),
+            ms: watch.elapsedMilliseconds,
+          );
+        case NativeSecure():
+          services.log('the window is secure (FLAG_SECURE); no picture is taken');
+          return const Shot.none(ScreenshotInfo.none(blocked: 'secure_window'));
+        case NativeFailed(:final message):
+          services.log('the native screenshot failed ($message); drawing it with Flutter');
+      }
+      final boundary = root.findRenderObject();
+      if (boundary is! RenderRepaintBoundary) return const Shot.none(ScreenshotInfo.none(blocked: 'failed'));
+      final flutter = await flutterShot(
+        boundary,
+        maskBoxes(root, level, blockPlatformViews: true),
+        pixelRatio: services.view().devicePixelRatio,
+      );
+      return flutter ?? const Shot.none(ScreenshotInfo.none(blocked: 'failed'));
+    } catch (error) {
+      services.log('no picture ($error)');
+      return const Shot.none(ScreenshotInfo.none(blocked: 'failed'));
+    } finally {
+      capturing = false;
+      notifyListeners();
+    }
   }
 
   Future<void> _submit(Map<String, Object?> message) async {
     final report = message['report'];
-    final clientId = message['client_id'];
+    final clientId = message['client_id'] is String ? message['client_id'] as String : null;
     if (report is! Map<String, Object?>) return;
+    // A retry reuses what the first attempt took and uploaded; a silent capture of an item that
+    // exists (D20, D113) is the screen as it is, never the pick's picture.
+    final silent = report['moment'] is String && report['moment'] != 'reported';
+    var attempt = clientId == null ? null : _tries[clientId];
+    if (attempt == null) {
+      attempt = _Attempt(silent ? null : (_pickShot ?? await _pickShotTaking));
+      if (clientId != null) _tries[clientId] = attempt;
+    }
     try {
-      final payload = await reportPayload(report);
+      final shot = attempt.shot ??= await takeShot();
+      if (shot.png != null && !attempt.uploaded(services.clock())) {
+        switch (await _api!.uploadPicture(shot.png!)) {
+          case PictureStored(:final id, :final expiresAt):
+            attempt
+              ..pictureId = id
+              ..expiresAt = expiresAt;
+          case PictureRefused(:final reason, :final message):
+            services.log('Viper refused the picture ($reason: $message); the report goes without it');
+            attempt.refused = true;
+          case PictureUnreachable(:final message):
+            services.log('the picture could not be sent ($message); the panel will try again');
+            send({
+              'type': 'viper:save:failed',
+              'message': "Viper couldn't be reached.",
+              'unreachable': true,
+              'client_id': ?clientId,
+            });
+            return;
+        }
+      }
+      final info = attempt.refused ? const ScreenshotInfo.none(blocked: 'failed') : shot.info;
+      final payload = await reportPayload(report, screenshot: info);
+      if (attempt.pictureId != null && !attempt.refused) payload['device_picture'] = attempt.pictureId;
+      if (clientId != null) _tries.remove(clientId);
       send({
         'type': 'viper:report',
         'payload': payload,
         'files': reportFiles(console: const [], network: const []),
         'client_id': ?clientId,
       });
+      if (!silent) _pickShot = null;
     } catch (error) {
       send({
         'type': 'viper:save:failed',
@@ -746,6 +895,10 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   Future<bool> didPopRoute() async {
     // Android's back closes the sheet before it reaches the app's navigator.
     if (!sheetOpen) return false;
+    if (picking) {
+      cancelPick();
+      return true;
+    }
     closeSheet();
     return true;
   }
@@ -768,3 +921,17 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
 }
 
 int _int(Object? value) => value is num ? value.toInt() : 0;
+
+/// One report's picture across its tries: taken once, uploaded once while its ID is good.
+class _Attempt {
+  _Attempt(this.shot);
+
+  Shot? shot;
+  String? pictureId;
+  DateTime? expiresAt;
+  bool refused = false;
+
+  /// The upload's ID is there and has five minutes left.
+  bool uploaded(DateTime now) =>
+      refused || (pictureId != null && expiresAt != null && expiresAt!.isAfter(now.add(const Duration(minutes: 5))));
+}

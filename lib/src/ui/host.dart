@@ -3,6 +3,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:viper_flutter/src/core/runtime.dart';
 import 'package:viper_flutter/src/ui/launcher.dart';
+import 'package:viper_flutter/src/ui/pick_handle.dart';
 import 'package:viper_flutter/src/ui/sheet.dart';
 
 /// The app with Viper over it.
@@ -24,12 +25,18 @@ class ViperHost extends StatelessWidget {
       child: Stack(
         fit: StackFit.passthrough,
         children: [
-          child,
+          // The app's own boundary: what the mask walk reads and toImage draws, never Viper's.
+          RepaintBoundary(key: runtime.appKey, child: child),
           Positioned.fill(
             child: ListenableBuilder(
               listenable: runtime,
-              builder: (context, _) =>
-                  runtime.phase == ViperPhase.ready ? _ViperLayer(runtime: runtime) : const SizedBox.shrink(),
+              builder: (context, _) => runtime.phase == ViperPhase.ready
+                  // Hidden, not removed, for the frame a shot is taken: the web view stays alive.
+                  ? Offstage(
+                      offstage: runtime.capturing,
+                      child: _ViperLayer(runtime: runtime),
+                    )
+                  : const SizedBox.shrink(),
             ),
           ),
         ],
@@ -53,6 +60,7 @@ class _ViperLayer extends StatelessWidget {
         children: [
           ViperSheet(runtime: runtime),
           if (!runtime.sheetOpen && !runtime.layout.hidden) ViperLauncher(runtime: runtime),
+          if (runtime.picking) PickHandle(runtime: runtime),
           ViperToastLayer(runtime: runtime),
         ],
       ),

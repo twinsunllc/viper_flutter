@@ -322,6 +322,11 @@ void main() {
       writeFixture('LoaderToPanelMessage', 'pick_none', none);
       h.panel!.post({'type': 'viper:pick:start', 'mode': 'element'});
       await tester.pump();
+      expect(runtime.picking, isTrue);
+      expect(await runtime.didPopRoute(), isFalse, reason: 'the sheet is closed, so back is the app\'s');
+      runtime.openSheet();
+      expect(await runtime.didPopRoute(), isTrue, reason: 'back while picking cancels the pick');
+      expect(runtime.picking, isFalse);
       final cancel = h.panel!.of('viper:pick:cancel').single;
       writeFixture('LoaderToPanelMessage', 'pick_cancel', cancel);
     });
@@ -349,13 +354,12 @@ void main() {
       expect(env['platform'], 'flutter');
       expect((env['app']! as Map)['context'], {'plan': 'pro'});
       expect((env['screen']! as Map)['logical'], {'width': 393.0, 'height': 852.0});
-      expect((env['screenshot']! as Map)['method'], 'none');
+      // No app on screen in this test: no picture, and the capture says why (D338).
+      expect(env['screenshot'], {'method': 'none', 'platform_views_blocked': false, 'blocked': 'failed'});
       expect(report['files'], [
         {'field': 'console', 'filename': 'console.json', 'body': '[]'},
         {'field': 'network', 'filename': 'network.json', 'body': '[]'},
       ]);
-      writeFixture('LoaderToPanelMessage', 'report', report);
-      writeFixture('ReportPayload', 'whole_screen', payload);
     });
 
     testWidgets('the device environment of a capture taken natively on an iPhone (D27, D338)', (tester) async {

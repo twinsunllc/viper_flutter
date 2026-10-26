@@ -64,7 +64,8 @@
     },
     "screenshot": {
       "method": "none",
-      "platform_views_blocked": false
+      "platform_views_blocked": false,
+      "blocked": "failed"
     },
     "time": {
       "captured_at": "2026-10-26T19:00:00.000Z",

@@ -53,11 +53,52 @@ final class ConfigUnreachable extends ConfigOutcome {
   final String message;
 }
 
+/// How a device picture upload came out (D330).
+sealed class PictureOutcome {
+  const PictureOutcome();
+}
+
+/// Viper took it: the signed ID the report names, good until [expiresAt].
+final class PictureStored extends PictureOutcome {
+  /// Stored.
+  const PictureStored(this.id, this.expiresAt);
+
+  /// `DevicePictureResponse.id`.
+  final String id;
+
+  /// When the ID stops working.
+  final DateTime expiresAt;
+}
+
+/// Viper refused it, readably (too big, too many waiting, an untrusted app).
+final class PictureRefused extends PictureOutcome {
+  /// Refused.
+  const PictureRefused(this.reason, this.message);
+
+  /// The API error's reason.
+  final String reason;
+
+  /// Its words.
+  final String message;
+}
+
+/// Viper didn't answer: the picture is kept and sent again (D330, D165).
+final class PictureUnreachable extends PictureOutcome {
+  /// Unreachable.
+  const PictureUnreachable(this.message);
+
+  /// What went wrong, for the log.
+  final String message;
+}
+
 /// The calls the package makes itself. The panel makes every call that needs a person's
 /// credentials (D131); these need only the key.
 abstract interface class ViperApi {
   /// GET /widget/config (D82).
   Future<ConfigOutcome> config();
+
+  /// POST /widget/device_pictures (D330): the masked PNG, before the report names it.
+  Future<PictureOutcome> uploadPicture(List<int> png);
 
   /// Closes the client.
   void close();
@@ -119,6 +160,52 @@ class HttpViperApi implements ViperApi {
       return const ConfigUnreachable('timed out');
     } on IOException catch (error) {
       return ConfigUnreachable('$error');
+    }
+  }
+
+  /// How long an upload may take: a 3x PNG is about a megabyte.
+  static const Duration uploadTimeout = Duration(seconds: 60);
+
+  @override
+  Future<PictureOutcome> uploadPicture(List<int> png) async {
+    final boundary = 'viper-${DateTime.now().microsecondsSinceEpoch}';
+    final head = utf8.encode(
+      '--$boundary\r\nContent-Disposition: form-data; name="key"\r\n\r\n$key\r\n'
+      '--$boundary\r\nContent-Disposition: form-data; name="file"; filename="device.png"\r\nContent-Type: image/png\r\n\r\n',
+    );
+    final tail = utf8.encode('\r\n--$boundary--\r\n');
+    try {
+      final request = await _client.postUrl(_url('/widget/device_pictures')).timeout(timeout);
+      viperHeaders(key: key, appId: appId).forEach(request.headers.set);
+      request.headers.contentType = ContentType('multipart', 'form-data', parameters: {'boundary': boundary});
+      request.contentLength = head.length + png.length + tail.length;
+      request
+        ..add(head)
+        ..add(png)
+        ..add(tail);
+      final response = await request.close().timeout(uploadTimeout);
+      final body = await utf8.decodeStream(response).timeout(timeout);
+      Object? json;
+      try {
+        json = jsonDecode(body);
+      } on FormatException {
+        json = null;
+      }
+      if (response.statusCode == 201 && json is Map && json['id'] is String) {
+        final expires = DateTime.tryParse('${json['expires_at']}') ?? DateTime.now().add(const Duration(hours: 1));
+        return PictureStored(json['id'] as String, expires);
+      }
+      if (response.statusCode >= 500 || json is! Map) {
+        return PictureUnreachable('Viper answered ${response.statusCode}');
+      }
+      return PictureRefused(
+        '${json['reason'] ?? response.statusCode}',
+        '${json['message'] ?? 'Viper refused the picture.'}',
+      );
+    } on TimeoutException {
+      return const PictureUnreachable('timed out');
+    } on IOException catch (error) {
+      return PictureUnreachable('$error');
     }
   }
 

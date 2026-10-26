@@ -8,7 +8,7 @@ already ships, in a web view (D328); this package plays the loader's part.
 Built in the Viper repo (`flutter/viper_flutter`) and published to `twinsunllc/viper_flutter`,
 which apps use as a git dependency (D339).
 
-**Status:** slice 2 of 6. The launcher, the panel in its sheet, the bridge, and the phone's
+**Status:** slice 3 of 6. The launcher, the panel in its sheet, the bridge, and the phone's
 masked screenshot uploaded with the report work. While picking, the sheet is a handle offering the
 whole screen; tapping an element, the full masking tests, console and network, shake and identity
 refresh come in the next slices.
@@ -21,8 +21,18 @@ native map): on iOS the key window through `drawViewHierarchyInRect`, on Android
 the Flutter surface, or of the window when a hybrid composition view is on screen. When the native
 call fails, Flutter draws it (`toImage`), with platform views blocked and the capture saying so. A
 window with Android's `FLAG_SECURE` (an app lock) gets no picture at all, on purpose, and the report
-says why. What the project's privacy level hides (passwords and `ViperPrivate` at Standard, every
-embedded web view) is filled before the PNG is encoded, so it never leaves the phone. The picture
+says why. What the project's privacy level hides is filled before the PNG is encoded, so it never leaves the
+phone (D331):
+
+| Level | Hidden |
+|---|---|
+| Standard | obscured text fields, anything under `ViperPrivate`, every embedded web view |
+| Strict | every text field, every image (`Image`, an avatar's photo, a decoration image, an SVG), every platform view, `ViperPrivate` |
+| Maximum | all text and images except under `ViperUnmask`, every field and platform view, `ViperPrivate` |
+
+Only what is painted is masked: a hidden tab, a route under another, an `Offstage` child are left
+alone, each box goes through every transform, and it's cut to its ancestors' clips (a scrolled
+list's edges, a `ClipRRect`). `ViperUnmask` shows text and images at Maximum, never a field. The picture
 goes to Viper first (`POST /widget/device_pictures`); the report names it, and only a thumbnail
 crosses into the panel.
 
@@ -103,7 +113,9 @@ directions on the example's Android release builds.
 
 ## The launcher (D335)
 
-Bottom right by default, or where the project's settings start it (D295). Drag it to any of the
+Bottom right by default, or where the project's settings start it (D295). A bottom spot sits
+above the app's bottom navigation bar or tab bar and the bottom safe area (D351); a project's own
+raise wins. Drag it to any of the
 eight spots; long press to tuck it to an edge tab (and back). Where it sits is remembered per
 install. Hiding it ("Hide Viper", brought back by a shake) arrives with shake in slice 6. It reads
 as one button to VoiceOver and TalkBack, with the counts in its label and tuck as an action.

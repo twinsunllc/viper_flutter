@@ -13,6 +13,8 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:viper_flutter/markers.dart' as markers;
+import 'package:viper_flutter/src/core/activity.dart';
+import 'package:viper_flutter/src/core/console.dart';
 import 'package:viper_flutter/src/core/runtime.dart';
 import 'package:viper_flutter/src/slots.dart';
 
@@ -22,6 +24,11 @@ export 'package:viper_flutter/src/core/api.dart' show implementationMarker, pack
 /// Viper: what shared code calls, and the staging entry point's `runZoned` and `start`.
 abstract final class Viper {
   static ViperRuntime? _runtime;
+
+  /// The console and network log, kept from runZoned on, so what the app prints before Viper
+  /// starts is there too (D333).
+  static final ActivityLog _activity = ActivityLog();
+  static final ConsoleCapture _console = ConsoleCapture(_activity);
 
   /// The running Viper, once started.
   static ViperRuntime? get runtime => _runtime;
@@ -34,7 +41,7 @@ abstract final class Viper {
   }
 
   static void _print(Zone self, ZoneDelegate parent, Zone zone, String line) {
-    // Kept for the console in slice 4 (D333); printed as the app meant either way.
+    _console.printed(line);
     parent.print(zone, line);
   }
 
@@ -50,7 +57,16 @@ abstract final class Viper {
   }) {
     if (!viperDefined || _runtime != null) return;
     WidgetsFlutterBinding.ensureInitialized();
-    final runtime = ViperRuntime(key: key, host: host, identityCallback: identity, contextCallback: context);
+    // Before the app builds its HTTP clients, after it set its own error handlers (D333).
+    _console.install();
+    final runtime = ViperRuntime(
+      key: key,
+      host: host,
+      identityCallback: identity,
+      contextCallback: context,
+      activity: _activity,
+      onStop: _console.release,
+    );
     _runtime = runtime;
     ViperSlots.handler.value = runtime;
     unawaited(runtime.boot());

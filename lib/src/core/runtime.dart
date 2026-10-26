@@ -8,8 +8,10 @@ import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
+import 'package:viper_flutter/src/core/activity.dart';
 import 'package:viper_flutter/src/core/api.dart';
 import 'package:viper_flutter/src/core/camera.dart';
+import 'package:viper_flutter/src/core/console.dart';
 import 'package:viper_flutter/src/core/device.dart';
 import 'package:viper_flutter/src/core/environment.dart';
 import 'package:viper_flutter/src/core/mask.dart';
@@ -127,9 +129,19 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     ViperServices? services,
     ScreenTracker? screens,
     Duration Function()? uptime,
+    ActivityLog? activity,
+    this.onStop,
   }) : services = services ?? ViperServices(),
        screens = screens ?? ScreenTracker(),
+       activity = activity ?? ActivityLog(),
        _uptime = uptime;
+
+  /// The console and the network calls a report carries (D333).
+  final ActivityLog activity;
+
+  /// Called when Viper won't run after all (below the floor, refused, switched off), to take back
+  /// what start installed.
+  final void Function()? onStop;
 
   /// The staging environment's widget key.
   final String key;
@@ -227,7 +239,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   Timer? _toastTimer;
 
   SignedIdentity? _identity;
-  final Map<String, Object?> _context = <String, Object?>{};
+  Map<String, Object?> _context = <String, Object?>{};
   Map<String, Object?>? _screen;
   Timer? _stateWrite;
   int? _tapAt;
@@ -280,7 +292,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
       ViperSlots.identityPending = false;
       ViperSlots.pendingIdentity = null;
     }
-    _context.addAll(ViperSlots.pendingContext);
+    _context = mergeContext(_context, ViperSlots.pendingContext);
     ViperSlots.pendingContext.clear();
   }
 
@@ -374,6 +386,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
 
   void _setPhase(ViperPhase next) {
     phase = next;
+    if (next == ViperPhase.unsupported || next == ViperPhase.refused) onStop?.call();
     notifyListeners();
   }
 
@@ -616,6 +629,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     sheetOpen = false;
     _retry?.cancel();
     phase = ViperPhase.off;
+    onStop?.call();
     notifyListeners();
   }
 
@@ -787,7 +801,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
       send({
         'type': 'viper:report',
         'payload': payload,
-        'files': reportFiles(console: const [], network: const []),
+        'files': reportFiles(console: activity.consoleEntries(_level), network: activity.networkEntries(_level)),
         'client_id': ?clientId,
       });
       if (!silent) _forgetPickShot();
@@ -820,7 +834,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
       app: AppDetails(
         environment: environment is Map && environment['kind'] is String ? environment['kind'] as String : null,
         userId: _identityId,
-        context: {..._context, ...?_safeContext()},
+        context: mergeContext(_context, _safeContext() ?? const {}),
       ),
     );
     final screen = screens.current(build: facts!.build);
@@ -866,9 +880,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   Widget wrap(Widget child) => ViperHost(runtime: this, child: child);
 
   @override
-  void recordError(Object error, StackTrace? stack) {
-    // Logged with the console in slice 4 (D333).
-  }
+  void recordError(Object error, StackTrace? stack) => activity.log('error', errorText(error, stack));
 
   @override
   void identify(SignedIdentity? identity, {IdentityRefresh? refresh}) {
@@ -877,9 +889,9 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   }
 
   @override
-  void context(Map<String, Object?> values) {
-    values.forEach((key, value) => value == null ? _context.remove(key) : _context[key] = value);
-  }
+  void context(Map<String, Object?> values) => _context = mergeContext(_context, values);
+
+  PrivacyLevel get _level => PrivacyLevel.parse((config?['project'] as Map?)?['privacy_level']);
 
   @override
   void routesChanged(ViperNavigatorObserver observer) {

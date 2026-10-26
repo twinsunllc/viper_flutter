@@ -114,7 +114,7 @@ class PickHandle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
-    final dialog = runtime.screens.topPopup() != null;
+    final dialog = runtime.pickDialogOpen;
     final words = runtime.pickMode == 'box' ? 'Drag a box around it' : 'Tap what you mean';
     return Positioned(
       left: 0,

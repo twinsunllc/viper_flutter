@@ -8,7 +8,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -49,7 +49,7 @@ Future<String> js(WebViewController web, String script) async {
   return text.startsWith('"') ? jsonDecode(text) as String : text;
 }
 
-Future<void> reportWholeScreen(WidgetTester tester, ViperRuntime runtime, String words) async {
+Future<void> reportWholeScreen(WidgetTester tester, ViperRuntime runtime, String words, {Finder? pick}) async {
   final web = (runtime.panel! as WebPanelView).controller;
   await tester.tap(find.byKey(launcherButtonKey));
   await tester.pump(const Duration(milliseconds: 600));
@@ -60,7 +60,12 @@ Future<void> reportWholeScreen(WidgetTester tester, ViperRuntime runtime, String
   await web.runJavaScript("document.querySelector('[data-act=\"report\"]').click()");
   await pumpUntil(tester, () async => runtime.picking);
   await tester.pump(const Duration(milliseconds: 300));
-  await tester.tap(find.byKey(PickHandle.wholeScreenKey));
+  // Whole screen from the handle, or a tap on what's meant (D332).
+  if (pick == null) {
+    await tester.tap(find.byKey(PickHandle.wholeScreenKey));
+  } else {
+    await tester.tapAt(tester.getCenter(pick));
+  }
   await pumpUntil(tester, () async => !runtime.picking && !runtime.capturing);
   await pumpUntil(tester, () async => runtime.panelState['view'] == 'compose');
   await pumpUntil(
@@ -164,5 +169,23 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('secure')));
     await tester.pump(const Duration(milliseconds: 500));
     expect((await shoot(tester, runtime)).info.method, 'native');
+  });
+
+  testWidgets("a tap picks a widget on a tab's own navigator, and the report names it (D332)", (tester) async {
+    staging.main();
+    await pumpUntil(tester, () async => Viper.runtime?.phase == ViperPhase.ready && Viper.runtime!.panelReady);
+    final runtime = Viper.runtime!;
+    await pumpUntil(tester, () async => find.text('Jobs').evaluate().isNotEmpty);
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Jobs')));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('Job 2: Diamond Head lot'));
+    await tester.pump(const Duration(seconds: 1));
+    expect(runtime.screens.current()['route'], 'Job details', reason: 'the ViperScreen on the nested navigator');
+    await reportWholeScreen(
+      tester,
+      runtime,
+      'Accept does nothing on job 2 (integration ${DateTime.now().millisecondsSinceEpoch})',
+      pick: find.byKey(const ValueKey('accept-job')),
+    );
   });
 }

@@ -8,7 +8,7 @@ already ships, in a web view (D328); this package plays the loader's part.
 Built in the Viper repo (`flutter/viper_flutter`) and published to `twinsunllc/viper_flutter`,
 which apps use as a git dependency (D339).
 
-**Status:** slice 4 of 6. The launcher, the panel in its sheet, the bridge, and the phone's
+**Status:** slice 5 of 6. The launcher, the panel in its sheet, the bridge, and the phone's
 masked screenshot uploaded with the report work. While picking, the sheet is a handle offering the
 whole screen; tapping an element, the full masking tests, console and network, shake and identity
 refresh come in the next slices.
@@ -110,6 +110,25 @@ tool/check_artifact.sh build/ios/iphoneos/Runner.app/Frameworks/App.framework ex
 It takes a `libapp.so`, an `App.framework`, or an `.apk`, `.aab` or `.ipa`, needs a release or
 profile build (a debug build has no snapshot), and never prints the host or the key. CI runs both
 directions on the example's Android release builds.
+
+## Picking and screens (D332)
+
+Report something shrinks the sheet to a handle across the bottom (D169). Tap what you mean: Viper
+hit tests the app, finds the widget that owns what was tapped, and names it the way people say it
+("Save button", "Password field", "Kalani Akana, lead card"); the panel's breadcrumb steps up to
+what holds it. Or pick the whole screen, the dialog on top, or draw a box. The anchor carries the
+widget's type, its `ValueKey`, its semantics label, its text and its box, so give the widgets
+testers report on a `ValueKey`.
+
+The screen is the page on top of the innermost navigator on screen (a tab's own navigator inside
+the app's), read from the navigator itself. Its key is, in order:
+
+1. the nearest `ViperScreen`'s name,
+2. the route's `settings.name` (other than the "/" every first route gets),
+3. the type of the widget the route built (`JobListScreen` is "Job list").
+
+A dialog, a bottom sheet, a menu, an open drawer and the tab a navigation bar shows are the
+screen's surfaces. Renaming a screen's class makes a new screen in Viper, which staff can merge.
 
 ## Console and network (D333)
 

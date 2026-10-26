@@ -670,6 +670,8 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     }
     // Element or box: the sheet shrinks to its handle and the next tap (or drag) picks (D169).
     pickMode = mode == 'box' ? 'box' : 'element';
+    // Read here, never while the handle builds: finding the popup walks the element tree.
+    pickDialogOpen = screens.topPopup() != null;
     picking = true;
     notifyListeners();
   }
@@ -707,6 +709,9 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
 
   /// Element or box, while picking.
   String pickMode = 'element';
+
+  /// A popup is open while picking, so the handle offers This dialog.
+  bool pickDialogOpen = false;
 
   /// The outline on what was picked, while composing; never in a picture (Viper's layer is hidden).
   Rect? outline;

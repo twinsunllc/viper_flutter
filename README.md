@@ -8,9 +8,23 @@ already ships, in a web view (D328); this package plays the loader's part.
 Built in the Viper repo (`flutter/viper_flutter`) and published to `twinsunllc/viper_flutter`,
 which apps use as a git dependency (D339).
 
-**Status:** slice 1 of 6. The launcher, the panel in its sheet and the bridge work; the
-screenshot, masking, console and network, picking an element, shake and identity refresh come in
-the next slices. A report today is the whole screen, with the device's details and no picture.
+**Status:** slice 2 of 6. The launcher, the panel in its sheet, the bridge, and the phone's
+masked screenshot uploaded with the report work. While picking, the sheet is a handle offering the
+whole screen; tapping an element, the full masking tests, console and network, shake and identity
+refresh come in the next slices.
+
+## The screenshot (D330, D331, D338)
+
+When a person picks the whole screen, Viper hides its own launcher and sheet for a frame and takes
+the phone's picture natively, so platform views come out as they look (a Liquid Glass tab bar, a
+native map): on iOS the key window through `drawViewHierarchyInRect`, on Android a `PixelCopy` of
+the Flutter surface, or of the window when a hybrid composition view is on screen. When the native
+call fails, Flutter draws it (`toImage`), with platform views blocked and the capture saying so. A
+window with Android's `FLAG_SECURE` (an app lock) gets no picture at all, on purpose, and the report
+says why. What the project's privacy level hides (passwords and `ViperPrivate` at Standard, every
+embedded web view) is filled before the PNG is encoded, so it never leaves the phone. The picture
+goes to Viper first (`POST /widget/device_pictures`); the report names it, and only a thumbnail
+crosses into the panel.
 
 ## Install
 
@@ -115,9 +129,14 @@ local environment of Harbor, key `hbr_loc_9w` (D342), which the example uses by 
    pnpm install && pnpm --filter @viper/protocol build && pnpm --filter @viper/widget build
    cd web && pnpm install && pnpm build && pnpm build:css
    export DATABASE_URL=postgres://postgres:postgres@localhost:4832/viper_try REDIS_URL=redis://localhost:4879/7
+   export APP_PORT=4830 APP_HOST=localhost:4830   # so sign-in and links stay on this port
    bin/rails db:create db:schema:load db:seed      # prints the people, the password and the example's key
    bin/rails server -p 4830 -b 0.0.0.0
    ```
+
+   A Flutter capture needs no renderer; Sidekiq marks it rendered. Without Sidekiq running, its
+   picture still shows, and `bin/rails runner 'Capture.where(render_status: :pending, platform:
+   :flutter).find_each { |c| Captures::RenderJob.perform_now(c.id) }'` marks it.
 
 2. **Run the example on the iOS simulator.** It reaches the Mac at `localhost:4830`:
 
@@ -139,13 +158,17 @@ local environment of Harbor, key `hbr_loc_9w` (D342), which the example uses by 
 
    Another Viper or key: `--dart-define=VIPER_HOST=... --dart-define=VIPER_KEY=...`.
 
-4. **Report something.** Tap the launcher, then Report something. Sign in as
-   `wilfred@twinsunsolutions.com` with the seeded password, or tell Viper your name.
+4. **Report something.** Tap the launcher, then Report something, then Whole screen on the handle
+   at the bottom. Say what's wrong and Send; tell Viper your name, or sign in as
+   `wilfred@twinsunsolutions.com` with the seeded password.
 
-5. **See it in the staff portal**: `http://localhost:4830`, signed in as Wilfred, Harbor's items.
+5. **See it in the staff portal**: `http://localhost:4830/staff/projects/harbor/items`, signed in
+   as Wilfred. The item shows the phone's picture and an Environment card for the device.
 
-The integration test does steps 2 to 4's opening on a device:
-`flutter test integration_test/panel_test.dart -d <device> --dart-define=VIPER=true`.
+The integration tests do this on a device: `integration_test/panel_test.dart` opens the panel, and
+`integration_test/report_test.dart` reports three whole screens (a form with its password masked,
+a native view, a web view) and, on Android, checks a `FLAG_SECURE` window gets no picture:
+`flutter test integration_test/report_test.dart -d <device> --dart-define=VIPER=true`.
 
 ## Developing
 

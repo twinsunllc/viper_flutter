@@ -4,6 +4,7 @@
 import 'package:flutter/cupertino.dart' show CupertinoTabBar;
 import 'package:flutter/material.dart' show BottomAppBar, BottomNavigationBar, NavigationBar;
 import 'package:flutter/widgets.dart';
+import 'package:viper_flutter/src/core/mask.dart';
 
 /// The Scaffold slots that hold a bar along the bottom edge.
 const Set<String> _bottomSlots = {'_ScaffoldSlot.bottomNavigationBar', '_ScaffoldSlot.persistentFooter'};
@@ -12,8 +13,13 @@ const Set<String> _bottomSlots = {'_ScaffoldSlot.bottomNavigationBar', '_Scaffol
 /// there's none. Only bars that touch the bottom of the screen count, and only ones painted.
 double bottomBarLift(Element root, {required Size screen, required EdgeInsets padding}) {
   var top = double.infinity;
+  final theaters = <RenderObject>{};
   void visit(Element element) {
     final widget = element.widget;
+    if (widget is Overlay) {
+      final theater = overlayTheater(element);
+      if (theater != null) theaters.add(theater);
+    }
     final bar =
         widget is NavigationBar ||
         widget is BottomNavigationBar ||
@@ -22,7 +28,8 @@ double bottomBarLift(Element root, {required Size screen, required EdgeInsets pa
         (widget is LayoutId && _bottomSlots.contains(widget.id.toString()));
     if (bar) {
       final box = element.findRenderObject();
-      if (box is RenderBox && box.attached && box.hasSize && !box.size.isEmpty) {
+      // A bar on a covered route or a hidden tab isn't on screen.
+      if (box is RenderBox && box.attached && box.hasSize && !box.size.isEmpty && isPainted(box, theaters)) {
         final rect = MatrixUtils.transformRect(box.getTransformTo(null), Offset.zero & box.size);
         if (rect.bottom >= screen.height - 1 && rect.top < top) top = rect.top;
       }

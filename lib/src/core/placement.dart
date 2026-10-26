@@ -207,12 +207,13 @@ Offset spotOffset(String spot, Size size, EdgeInsets padding, {double raise = 0}
   };
 }
 
-/// The spot nearest to where a drag let go of the button (its top left at [offset]).
-String nearestSpot(Offset offset, Size size, EdgeInsets padding) {
+/// The spot nearest to where a drag let go of the button (its top left at [offset]), with bottom
+/// spots where they're drawn: above the app's bottom bar ([lift], D351).
+String nearestSpot(Offset offset, Size size, EdgeInsets padding, {double lift = 0}) {
   var best = 'bottom-right';
   var distance = double.infinity;
   for (final spot in launcherSpots) {
-    final d = (spotOffset(spot, size, padding) - offset).distanceSquared;
+    final d = (spotOffset(spot, size, padding, raise: lift) - offset).distanceSquared;
     if (d < distance) {
       distance = d;
       best = spot;

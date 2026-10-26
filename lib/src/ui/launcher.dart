@@ -58,7 +58,8 @@ class _ViperLauncherState extends State<ViperLauncher> {
   }
 
   void _measure() {
-    if (!mounted || _drag != null) return;
+    // Only the round button sits on a bottom spot; a tucked tab has nothing to keep clear of.
+    if (!mounted || _drag != null || widget.runtime.layout.tucked) return;
     final root = widget.runtime.appKey.currentContext;
     if (root is! Element) return;
     final media = MediaQuery.of(context);
@@ -182,7 +183,7 @@ class _ViperLauncherState extends State<ViperLauncher> {
       final middle = drag.dy + edgeTabSize.height / 2;
       _runtime.moveLauncher(layout.copyWith(edgePosition: (middle / size.height * 100).clamp(0, 100).toDouble()));
     } else {
-      _runtime.moveLauncher(layout.copyWith(spot: nearestSpot(drag, size, padding)));
+      _runtime.moveLauncher(layout.copyWith(spot: nearestSpot(drag, size, padding, lift: _lift)));
     }
     setState(() => _drag = null);
   }

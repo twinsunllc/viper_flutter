@@ -1,0 +1,26 @@
+name: viper_flutter_example
+description: "The example app for viper_flutter: every kind of screen Viper has to report from."
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  viper_flutter:
+    path: ../
+  webview_flutter: ^4.14.1
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/crew.png

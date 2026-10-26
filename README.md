@@ -126,12 +126,16 @@ local environment of Harbor, key `hbr_loc_9w` (D342), which the example uses by 
    flutter run -d <simulator> -t lib/main_staging.dart --dart-define=VIPER=true
    ```
 
-3. **Or on an Android emulator.** It reaches the Mac at `10.0.2.2:4830` by default; or run
-   `adb reverse tcp:4830 tcp:4830` and add `--dart-define=VIPER_HOST=http://localhost:4830`:
+3. **Or on an Android emulator.** Forward the port so the emulator's localhost is the Mac's:
 
    ```sh
+   adb reverse tcp:4830 tcp:4830
    flutter run -d emulator-5554 -t lib/main_staging.dart --dart-define=VIPER=true
    ```
+
+   Not `10.0.2.2`: over plain HTTP only localhost is a secure context, and outside one the web
+   view sends no `Sec-Fetch-Site`, so Viper refuses the panel's own reads (403). A deployed Viper
+   is HTTPS and has no such problem.
 
    Another Viper or key: `--dart-define=VIPER_HOST=... --dart-define=VIPER_KEY=...`.
 

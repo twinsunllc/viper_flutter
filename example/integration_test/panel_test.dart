@@ -44,6 +44,19 @@ void main() {
     final text = await web.runJavaScriptReturningResult('document.body.innerText');
     expect('$text', isNot(contains('This panel opens from the Viper widget')));
 
+    // The panel's own reads pass as Viper's (Sec-Fetch-Site, D329): a 403 here means the web view
+    // isn't in a secure context (plain HTTP to anything but localhost).
+    await web.runJavaScript(
+      "window.__viperCheck = 'pending'; fetch('/widget/screen?route=%2F&url=&title=Home&key=' + "
+      "new URLSearchParams(location.search).get('key')).then(r => window.__viperCheck = String(r.status))",
+    );
+    var status = '"pending"';
+    for (var i = 0; i < 50 && status.contains('pending'); i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      status = '${await web.runJavaScriptReturningResult('window.__viperCheck')}';
+    }
+    expect(status.replaceAll('"', ''), '200');
+
     // The panel's close button sends viper:close; Dart closes the sheet.
     await web.runJavaScript("ViperBridge.postMessage(JSON.stringify({type: 'viper:close'}))");
     await pumpUntil(tester, () => !runtime.sheetOpen);

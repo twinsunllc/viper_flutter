@@ -747,8 +747,10 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     if (hit == null) return;
     picking = false;
     _pickMode = 'box';
-    _pickPath = pathFor(hit, _level);
-    _pickIndex = _pickPath.length - 1;
+    // A box is the box: one step, nothing to step up to.
+    final path = pathFor(hit, _level);
+    _pickPath = [path.last];
+    _pickIndex = 0;
     _pickBox = {
       'x': rect.left.round(),
       'y': rect.top.round(),
@@ -811,7 +813,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   /// What staff see beside a step (W03): the widget's type and its key.
   static String _detail(PickedStep step) {
     final key = step.element.widget.key;
-    return key is ValueKey ? '${step.widget} · ${key.value}' : step.widget;
+    return key is ValueKey && !underPrivate(step.element) ? '${step.widget} · ${key.value}' : step.widget;
   }
 
   Rect? _rectOf(Element element) {

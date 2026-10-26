@@ -41,12 +41,18 @@ class ScreenTracker {
   }
 
   /// The route on top of [navigator], read from the navigator, so a late observer still knows it.
+  ///
+  /// Navigator has no getter for its current route, so this asks popUntil, whose predicate is
+  /// called with the top route first: answering true at once stops it before it pops anything.
+  /// The predicate must always answer true; anything else would pop the app's own routes.
   static Route<dynamic>? topRoute(NavigatorState navigator) {
     Route<dynamic>? top;
-    navigator.popUntil((route) {
-      top = route;
+    bool readOnly(Route<dynamic> route) {
+      top ??= route;
       return true;
-    });
+    }
+
+    navigator.popUntil(readOnly);
     return top;
   }
 
@@ -75,9 +81,8 @@ class ScreenTracker {
 
   /// The popup on top of any navigator on screen: a dialog, a bottom sheet, a menu.
   PopupRoute<dynamic>? topPopup() {
-    for (final observer in _observers()) {
-      final navigator = observer.navigator;
-      if (navigator == null || !navigator.mounted) continue;
+    // The navigators on screen only: a popup on a hidden tab's own navigator isn't showing.
+    for (final navigator in _navigators()) {
       final top = topRoute(navigator);
       if (top is PopupRoute && top.isActive) return top;
     }
@@ -170,7 +175,11 @@ Map<String, Object?>? _tabOf(Element page, PrivacyLevel level) {
       label = widget.items[widget.currentIndex].label;
     }
     if (label != null && onScreen(element)) {
-      found = {'kind': 'tab', 'key': 'tab:${_slug(label)}', 'name': level == PrivacyLevel.maximum ? 'Tab' : label};
+      // At Maximum a tab is known by its place, not its words.
+      final index = widget is NavigationBar ? widget.selectedIndex : (widget as BottomNavigationBar).currentIndex;
+      found = level == PrivacyLevel.maximum
+          ? {'kind': 'tab', 'key': 'tab:${index + 1}', 'name': 'Tab ${index + 1}'}
+          : {'kind': 'tab', 'key': 'tab:${_slug(label)}', 'name': label};
       return;
     }
     element.visitChildElements(visit);

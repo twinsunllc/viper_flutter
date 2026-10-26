@@ -14,6 +14,7 @@ import 'package:viper_flutter/src/core/mask.dart';
 import 'package:viper_flutter/src/core/opener.dart';
 import 'package:viper_flutter/src/core/runtime.dart';
 import 'package:viper_flutter/src/core/screens.dart';
+import 'package:viper_flutter/src/core/shots.dart';
 import 'package:viper_flutter/src/core/store.dart';
 import 'package:viper_flutter/src/ui/panel_view.dart';
 
@@ -143,6 +144,20 @@ class FakeNative implements ViperNative {
 
   @override
   Future<String?> timezone() async => 'Pacific/Honolulu';
+
+  /// Whether a shake is listened for, and how to send one.
+  bool shaking = false;
+  void Function()? shake;
+
+  @override
+  Future<bool> startShake(void Function() onShake) async {
+    shaking = true;
+    shake = onShake;
+    return true;
+  }
+
+  @override
+  Future<void> stopShake() async => shaking = false;
 }
 
 /// A [ViperDevice] with fixed facts.
@@ -260,6 +275,9 @@ class Harness {
   /// The plugin.
   final FakeNative native = FakeNative();
 
+  /// Where unsent pictures are kept.
+  final MemoryShotStore shots = MemoryShotStore();
+
   /// The log.
   final List<String> log = [];
 
@@ -292,6 +310,7 @@ class Harness {
       view: () => view,
       timezone: (_) => 'Pacific/Honolulu',
       native: native,
+      shots: shots,
       panelView: ({required base, required onMessage, required onExternal, required onLoadError, required background}) {
         panelsMade++;
         return panel = FakePanelView(base, onMessage);

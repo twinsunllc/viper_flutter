@@ -334,6 +334,32 @@ void main() {
     }
   });
 
+  testWidgets("checking a fix outlines the item's widget when it's on screen (W07)", (tester) async {
+    final (h, runtime, _) = await pumpApp(tester);
+    h.panel!.post({
+      'type': 'viper:highlight',
+      'item_id': '6f1d2c3b-4a5e-4f60-8b7a-9c0d1e2f3a4b',
+      'anchor': {
+        'locators': {'widget': 'OutlinedButton', 'key': 'edit-cast', 'text': 'Edit cast'},
+      },
+    });
+    await settle(tester);
+    expect(runtime.outline, tester.getRect(find.byKey(const ValueKey('edit-cast'))));
+    expect(find.byType(PickOutline), findsOneWidget);
+    h.panel!.post({'type': 'viper:highlight', 'item_id': '6f1d2c3b-4a5e-4f60-8b7a-9c0d1e2f3a4b'});
+    await settle(tester);
+    expect(runtime.outline, isNull);
+    h.panel!.post({
+      'type': 'viper:highlight',
+      'item_id': '6f1d2c3b-4a5e-4f60-8b7a-9c0d1e2f3a4b',
+      'anchor': {
+        'locators': {'widget': 'OutlinedButton', 'key': 'gone'},
+      },
+    });
+    await settle(tester);
+    expect(runtime.outline, isNull, reason: 'not on screen: nothing outlined');
+  });
+
   testWidgets('a box is one step: nothing to step up to', (tester) async {
     final (h, runtime, _) = await pumpApp(tester);
     await startPick(tester, h, 'box');

@@ -24,6 +24,8 @@ Future<(Harness, ViperRuntime)> started(WidgetTester tester, {Harness? harness})
   final runtime = h.runtime();
   addTearDown(runtime.dispose);
   await runtime.boot();
+  // Let what boot started without waiting (the shake listener) settle.
+  await tester.pump();
   return (h, runtime);
 }
 
@@ -141,7 +143,7 @@ void main() {
         'platform': 'flutter',
         'app_id': 'dev.twinsun.viper.example',
         'os': 'iOS',
-        'shake': false,
+        'shake': true,
         'text_scale': 1.0,
       });
       expect((sent[1]['state']! as Map)['view'], 'compose');
@@ -157,6 +159,29 @@ void main() {
       for (final message in sent) {
         writeFixture('LoaderToPanelMessage', (message['type']! as String).substring('viper:'.length), message);
       }
+    });
+
+    testWidgets('a shake opens Viper, and shows it again when hidden (D335)', (tester) async {
+      final (h, runtime) = await started(tester);
+      await ready(tester, h);
+      expect(h.native.shaking, isTrue);
+      runtime.setHidden(true);
+      h.native.shake!();
+      expect(runtime.layout.hidden, isFalse);
+      expect(runtime.sheetOpen, isTrue);
+    });
+
+    testWidgets("a project with shake off never listens, and doesn't offer hiding (D335)", (tester) async {
+      final config = exampleConfig();
+      (config['project']! as Map)['shake_to_open'] = false;
+      final (h, runtime) = await started(
+        tester,
+        harness: Harness(view: tester.view, outcome: ConfigOk(config)),
+      );
+      await ready(tester, h);
+      expect(h.native.shaking, isFalse);
+      expect(runtime.shakeAvailable, isFalse);
+      expect(h.panel!.of('viper:bridge').single['shake'], isFalse);
     });
 
     testWidgets('viper:bridge says Android and its text scale', (tester) async {
@@ -476,6 +501,31 @@ void main() {
       final sent = h.panel!.of('viper:identity').last;
       expect(sent['identity'], identity);
       writeFixture('LoaderToPanelMessage', 'identity_signed', sent);
+    });
+
+    testWidgets('a minute before the signature expires, the app is asked for a fresh one (D86)', (tester) async {
+      final (h, runtime) = await started(tester);
+      await ready(tester, h);
+      final exp = Harness.now.add(const Duration(minutes: 3)).millisecondsSinceEpoch ~/ 1000;
+      Map<String, Object?> signed(int exp) => {
+        'v': 1,
+        'payload': {'id': 'u_7', 'email': 'dana@example.com', 'name': 'Dana Ortiz', 'iat': exp - 600, 'exp': exp},
+        'signature': 'sig-$exp',
+      };
+      var asked = 0;
+      runtime.identify(
+        signed(exp),
+        refresh: () async {
+          asked++;
+          return signed(exp + 600);
+        },
+      );
+      await tester.pump(const Duration(minutes: 1, seconds: 30));
+      expect(asked, 0);
+      await tester.pump(const Duration(seconds: 31));
+      expect(asked, 1);
+      expect((h.panel!.of('viper:identity').last['identity']! as Map)['signature'], 'sig-${exp + 600}');
+      runtime.identify(null);
     });
 
     testWidgets('resume and pause tell the panel (D42)', (tester) async {

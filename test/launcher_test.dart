@@ -106,7 +106,7 @@ void main() {
     final (_, runtime) = await pumpApp(tester);
     await tester.longPress(launcher);
     await tester.pumpAndSettle();
-    expect(find.text('Hide Viper'), findsNothing, reason: 'hiding waits for shake (slice 6)');
+    expect(find.text('Hide Viper'), findsOneWidget, reason: 'a shake can bring it back');
     await tester.tap(find.text('Tuck to the edge'));
     await tester.pumpAndSettle();
     expect(runtime.layout.tucked, isTrue);
@@ -239,5 +239,18 @@ void main() {
     await tester.pump();
     expect(tester.getRect(launcher).bottom, 852 - 34 - 16);
     expect(lifted, lessThan(852 - 34 - 16));
+  });
+
+  testWidgets('turning the phone, or an iPad split view, puts the launcher back on its spot', (tester) async {
+    await pumpApp(tester);
+    expect(tester.getRect(launcher).bottomRight, const Offset(393 - 16, 852 - 34 - 16));
+    tester.view.physicalSize = const Size(2556, 1179);
+    tester.view.padding = const FakeViewPadding(left: 177, right: 177, bottom: 63);
+    await tester.pump();
+    expect(tester.getRect(launcher).bottomRight, const Offset(852 - 59 - 16, 393 - 21 - 16));
+    tester.view.physicalSize = const Size(1500, 2048);
+    tester.view.padding = FakeViewPadding.zero;
+    await tester.pump();
+    expect(tester.getRect(launcher).bottomRight, const Offset(500 - 16, 682.6666666666666 - 16));
   });
 }

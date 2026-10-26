@@ -272,6 +272,31 @@ void main() {
     expect((h.panel!.of('viper:report').single['payload']! as Map)['device_picture'], 'pic-2');
   });
 
+  testWidgets('an unsent picture outlives the app: the send after a restart has the same picture (D165)', (
+    tester,
+  ) async {
+    final (h, runtime) = await pumpApp(tester);
+    h.api.pictures = [const PictureUnreachable('offline')];
+    final submit = {
+      'type': 'viper:submit',
+      'client_id': 'kept-1',
+      'report': {'scope': 'screen', 'body': 'Offline, then closed'},
+    };
+    h.panel!.post(submit);
+    await settle(tester);
+    expect(h.shots.shots.keys, ['kept-1']);
+    // The app restarts: a new runtime, nothing in memory, the same phone.
+    final again = h.runtime();
+    addTearDown(again.dispose);
+    await again.boot();
+    h.api.pictures = [PictureStored('pic-9', DateTime.utc(2026, 10, 26, 20))];
+    again.panelReady = true;
+    final before = h.native.captures.length;
+    await again.handle(submit);
+    expect(h.native.captures.length, before, reason: 'the kept picture, not a new one');
+    expect(h.shots.shots, isEmpty, reason: 'sent, it goes');
+  });
+
   testWidgets('a refused picture lets the report go without it', (tester) async {
     final (h, runtime) = await pumpApp(tester);
     h.api.pictures = [const PictureRefused('too_many', 'Too many pictures are waiting.')];

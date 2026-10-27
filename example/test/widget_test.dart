@@ -30,6 +30,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('password')), findsOneWidget);
     expect(find.byKey(const ValueKey('viper-launcher')), findsNothing);
+    // The ways into Viper are staging's only (D371).
+    expect(find.byKey(const ValueKey('report-a-bug')), findsNothing);
+    expect(find.byKey(const ValueKey('show-viper')), findsNothing);
   });
 
   test('only main_staging.dart imports the implementation (D336)', () {

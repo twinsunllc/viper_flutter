@@ -27,7 +27,13 @@ void main() => Viper.runZoned(
         print('Viper: no VIPER_KEY given; run with --dart-define=VIPER_KEY=<key>. Viper is off.');
         return;
       }
-      Viper.start(key: _key, host: viperHost, context: () => {'example': true});
+      Viper.start(
+        key: _key,
+        host: viperHost,
+        context: () => {'example': true},
+        // The Account tab's Show Viper row brings a hidden launcher back (D371).
+        revealHint: 'Tap Show Viper on the Account tab to bring it back.',
+      );
     },
   ),
 );

@@ -1,9 +1,12 @@
-// The Account tab: a form with a password field, which Standard masks (D331).
+// The Account tab: a form with a password field, which Standard masks (D331), and in a staging
+// build the app's own ways into Viper (D371): Report a bug opens it, Show Viper brings back a
+// launcher the tester hid.
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:logging/logging.dart';
+import 'package:viper_flutter/markers.dart';
 
 /// The tab.
 class AccountTab extends StatefulWidget {
@@ -95,6 +98,25 @@ class _AccountTabState extends State<AccountTab> {
               setState(() => _secure = on);
             },
           ),
+        // Only in a build with Viper in it; production never shows these rows.
+        if (viperDefined) ...[
+          const Divider(height: 32),
+          ListTile(
+            key: const ValueKey('report-a-bug'),
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.bug_report_outlined),
+            title: const Text('Report a bug'),
+            onTap: Viper.open,
+          ),
+          ListTile(
+            key: const ValueKey('show-viper'),
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.visibility_outlined),
+            title: const Text('Show Viper'),
+            subtitle: const Text('Brings the Viper button back if you hid it.'),
+            onTap: Viper.show,
+          ),
+        ],
       ],
     );
   }

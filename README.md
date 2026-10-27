@@ -40,8 +40,8 @@ crosses into the panel.
 dependencies:
   viper_flutter:
     git:
-      url: git@github.com:twinsunllc/viper_flutter.git
-      ref: flutter-v0.1.0
+      url: https://github.com/twinsunllc/viper_flutter.git
+      ref: flutter-v0.2.0
 ```
 
 Flutter 3.44 or later. iOS builds through Swift Package Manager or CocoaPods. Viper runs on iOS

@@ -130,7 +130,8 @@ class ActivityLog {
           'path': callPath(call.url, level),
           'status': call.status,
           'duration_ms': call.duration.inMilliseconds,
-          // When it finished, for the full log's time order (D359, D368).
+          // When it finished, for the full log's time order (D359, D368). A call with an error but
+          // no duration yet reads as when it started.
           'at_ms': call.started.add(call.duration).millisecondsSinceEpoch,
           'request_id': ?call.requestId,
           'error': ?call.error,

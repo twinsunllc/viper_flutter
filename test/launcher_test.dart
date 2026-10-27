@@ -177,6 +177,26 @@ void main() {
     expect(find.textContaining('Viper is hidden'), findsNothing);
   });
 
+  testWidgets("Viper.open while Viper can't be reached shows the note, though nothing else of Viper is up (D371)", (
+    tester,
+  ) async {
+    final (h, runtime) = await pumpApp(tester, outcome: const ConfigUnreachable('offline'));
+    expect(runtime.phase, ViperPhase.unreachable);
+    expect(launcher, findsNothing);
+    runtime.open();
+    await tester.pump();
+    expect(find.text(ViperRuntime.unreachableToast), findsOneWidget);
+    expect(h.api.calls, 2, reason: 'asked again at once');
+    await tester.pump(const Duration(seconds: 5));
+    expect(find.text(ViperRuntime.unreachableToast), findsNothing);
+    // Viper answers at the next retry, and the launcher shows; the open didn't wait for it.
+    h.api.outcome = ConfigOk(exampleConfig());
+    await tester.pump(const Duration(seconds: 20));
+    await tester.pump();
+    expect(launcher, findsOneWidget);
+    expect(runtime.sheetOpen, isFalse);
+  });
+
   testWidgets('without a shake or a way back from the app, hiding is never offered (D335, D371)', (tester) async {
     final (_, runtime) = await pumpApp(tester);
     runtime.shakeAvailable = false;

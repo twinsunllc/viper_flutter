@@ -252,7 +252,8 @@ void main() {
         // The show it carried is kept; the open isn't.
         expect(runtime.layout.hidden, isFalse);
         expect(runtime.sheetOpen, isFalse);
-        await tester.pump(const Duration(seconds: 5));
+        // Reached after all, the note goes rather than contradict the launcher.
+        expect(runtime.toast, isNull);
       },
     );
 

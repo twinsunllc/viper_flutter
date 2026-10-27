@@ -386,6 +386,11 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     );
     unawaited(panel!.load(bridgeUrl(panelUrl)));
     _setPhase(ViperPhase.ready);
+    // Reached after all: "can't be reached" would contradict the launcher coming back.
+    if (toast == unreachableToast) {
+      _toastTimer?.cancel();
+      toast = null;
+    }
     if (_openWhenReady) {
       open();
     } else if (_showWhenReady) {
@@ -486,7 +491,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     phase = next;
     if (next == ViperPhase.unsupported || next == ViperPhase.refused) onStop?.call();
     // Viper won't run after all: a show or open the app asked for while it started never comes.
-    if (next == ViperPhase.unsupported || next == ViperPhase.refused || next == ViperPhase.off) {
+    if (next == ViperPhase.unsupported || next == ViperPhase.refused) {
       _showWhenReady = _openWhenReady = false;
     }
     notifyListeners();

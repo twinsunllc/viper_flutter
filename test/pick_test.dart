@@ -546,4 +546,75 @@ void main() {
     expect(textOf(tester.element(find.byType(ListTile)), PrivacyLevel.standard), '3 Job 3: Waimanalo beach');
     expect(textOf(tester.element(find.byKey(const ValueKey('glyph'))), PrivacyLevel.standard), 'Call time 8:00 a.m.');
   });
+
+  testWidgets("an app's own tappable card picks as itself, named by what it shows; a tab isn't named twice", (
+    tester,
+  ) async {
+    final (h, runtime, _) = await pumpApp(
+      tester,
+      device: pixel9,
+      home: DefaultTabController(
+        length: 2,
+        child: Scaffold(
+          appBar: AppBar(
+            bottom: const TabBar(
+              tabs: [
+                Tab(text: 'Jobs'),
+                Tab(text: 'Crew'),
+              ],
+            ),
+          ),
+          body: Column(
+            children: [
+              GestureDetector(
+                onTap: () {},
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  color: const Color(0xFFEEEEEE),
+                  child: const Column(children: [Text('Waimanalo beach'), Text('8:00 a.m.')]),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await startPick(tester, h, 'element');
+    await tester.tapAt(tester.getCenter(find.text('8:00 a.m.')));
+    await settle(tester);
+    expect(h.panel!.of('viper:pick:result').single['label'], 'Waimanalo beach 8:00 a.m.');
+    final anchor = h.panel!.of('viper:pick:result').single['anchor']! as Map<String, Object?>;
+    expect((anchor['locators']! as Map<String, Object?>)['widget'], 'GestureDetector');
+
+    h.panel!.scripts.clear();
+    await startPick(tester, h, 'element');
+    await tester.tapAt(tester.getCenter(find.text('Crew')));
+    await settle(tester);
+    final tab = h.panel!.of('viper:pick:result').single;
+    expect(tab['label'], 'Crew tab');
+    final path = ((tab['context']! as Map<String, Object?>)['path']! as List).map((s) => (s as Map)['label']).toList();
+    expect(path.where((label) => label == 'Crew tab' || label == 'Crew'), hasLength(1), reason: '$path');
+    expect(runtime.picking, isFalse);
+  });
+
+  testWidgets('a tap on nothing worth naming is the whole screen, never a "Padding" or a "Column"', (tester) async {
+    final (h, runtime, _) = await pumpApp(
+      tester,
+      device: pixel9,
+      home: const Scaffold(
+        body: Padding(
+          padding: EdgeInsets.all(24),
+          child: Column(children: [SizedBox(height: 400)]),
+        ),
+      ),
+    );
+    await startPick(tester, h, 'element');
+    await tester.tapAt(const Offset(200, 300));
+    await settle(tester);
+    expect(runtime.picking, isFalse);
+    expect(h.panel!.of('viper:pick:result'), isEmpty);
+    final none = h.panel!.of('viper:pick:none').single;
+    expect(none['scope'], 'screen');
+    expect(none['label'], 'Whole screen');
+  });
 }

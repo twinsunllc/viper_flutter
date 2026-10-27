@@ -894,6 +894,11 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     final root = _appRoot;
     final hit = root == null ? null : elementAt(root, position);
     if (hit == null) return;
+    // Nothing worth naming under the finger (the space between widgets): the whole screen.
+    if (!nameable(hit)) {
+      pickWholeScreen();
+      return;
+    }
     picking = false;
     _pickMode = 'element';
     _pickPath = pathFor(hit, _level);

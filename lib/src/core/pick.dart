@@ -2,6 +2,9 @@
 // that is a render object (a TextSpan isn't) is mapped to the element that owns it by walking the
 // element tree, which works in release builds, and the path up from it is the steps the panel's
 // breadcrumb offers. The label comes from what the widget says: its semantics, its text, its type.
+// An app's own tappable widget (an InkWell or GestureDetector that isn't part of a control) is a
+// thing worth naming too, so a custom card or row picks as itself; a tap on nothing worth naming
+// is the whole screen.
 import 'package:flutter/cupertino.dart' show CupertinoNavigationBar, CupertinoTabBar;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -104,6 +107,20 @@ const Set<String> _controls = {
   'SegmentedButton',
 };
 
+/// Controls a tap handler can be part of: an InkWell inside one of these is the control's own.
+const Set<String> _ownsTaps = {
+  ..._controls,
+  'Checkbox',
+  'Switch',
+  'Radio',
+  'Slider',
+  'BackButton',
+  'CloseButton',
+  'ExpansionTile',
+  'Stepper',
+  'SearchBar',
+};
+
 /// The element under [position] in the app below [root] (logical pixels, on the screen), or null.
 Element? elementAt(Element root, Offset position) {
   final render = root.findRenderObject();
@@ -143,24 +160,69 @@ bool meaningful(Widget widget) {
   return widget.key is ValueKey && !name.startsWith('_');
 }
 
+/// What an element is worth naming: a [meaningful] widget, or a tap handler of the app's own
+/// (a custom card or row), never one that's part of a control (a button's own InkWell).
+bool meaningfulElement(Element element) => meaningful(element.widget) || _ownTappable(element);
+
+/// Whether [widget] answers a tap: an InkWell or InkResponse, or a GestureDetector with a tap.
+bool _tappable(Widget widget) {
+  if (widget is InkResponse) return widget.onTap != null || widget.onLongPress != null;
+  if (widget is GestureDetector) {
+    return widget.onTap != null || widget.onTapUp != null || widget.onLongPress != null;
+  }
+  return false;
+}
+
+bool _ownTappable(Element element) {
+  if (!_tappable(element.widget)) return false;
+  var inside = false;
+  element.visitAncestorElements((ancestor) {
+    if (ancestor.widget is Navigator || ancestor.widget is Overlay) return false;
+    inside = _ownsTaps.contains(ancestor.widget.runtimeType.toString());
+    return !inside;
+  });
+  return !inside;
+}
+
+/// Whether a tap on [picked] lands on anything worth naming. When it doesn't (the space between
+/// widgets), the pick is the whole screen rather than a "Padding" or a "Column".
+bool nameable(Element picked) {
+  if (meaningfulElement(picked)) return true;
+  var found = false;
+  picked.visitAncestorElements((ancestor) {
+    if (ancestor.widget is Navigator || ancestor.widget is Overlay) return false;
+    found = meaningfulElement(ancestor);
+    return !found;
+  });
+  return found;
+}
+
 /// The path from the screen down to the picked element, at most [depth] steps, the picked one last
 /// (W17). Text inside a control is the control.
 List<PickedStep> pathFor(Element picked, PrivacyLevel level, {int depth = 4}) {
   final chain = <Element>[];
-  if (meaningful(picked.widget)) chain.add(picked);
+  if (meaningfulElement(picked)) chain.add(picked);
   picked.visitAncestorElements((ancestor) {
     if (ancestor.widget is Navigator || ancestor.widget is Overlay) return false;
-    if (meaningful(ancestor.widget)) chain.add(ancestor);
-    return chain.length < depth + 2;
+    if (meaningfulElement(ancestor)) chain.add(ancestor);
+    return chain.length < depth + 3;
   });
+  // A tap handler around a control (a TabBar's InkWell around its Tab) is the control again.
+  for (var i = chain.length - 1; i > 0; i--) {
+    if (_tappable(chain[i].widget) && _controls.contains(chain[i - 1].widget.runtimeType.toString())) {
+      chain.removeAt(i);
+    }
+  }
   // A Dialog inside an AlertDialog is the same thing said twice.
   chain.removeWhere(
     (element) =>
         element.widget.runtimeType == Dialog &&
         chain.any((other) => other != element && (other.widget is AlertDialog || other.widget is SimpleDialog)),
   );
-  // A tap on a button's words means the button.
-  while (chain.length > 1 && chain.first.widget is Text && _controls.contains(chain[1].widget.runtimeType.toString())) {
+  // A tap on a button's words means the button, and on a tappable card's words, the card.
+  while (chain.length > 1 &&
+      chain.first.widget is Text &&
+      (_controls.contains(chain[1].widget.runtimeType.toString()) || _tappable(chain[1].widget))) {
     chain.removeAt(0);
   }
   if (chain.isEmpty) chain.add(picked);
@@ -200,6 +262,8 @@ String labelFor(Element element, PrivacyLevel level) {
   if (noun == null) {
     final key = widget.key;
     final keyed = key is ValueKey && !private ? displayName('${key.value}') : null;
+    // A tap handler is named by what it shows: its type ("Ink well") means nothing to anyone.
+    if (_tappable(widget)) return words ?? keyed ?? 'Button';
     return words ?? keyed ?? displayName(type);
   }
   if (noun == 'text') return words ?? 'Text';

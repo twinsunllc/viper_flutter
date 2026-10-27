@@ -184,8 +184,10 @@ class PickHandle extends StatelessWidget {
           children: [
             ValueListenableBuilder<PickAim?>(
               valueListenable: runtime.aim,
+              // Only the instruction is announced: a screen reader reading each aim as a finger
+              // slides would never stop talking.
               builder: (context, aim, _) => Semantics(
-                liveRegion: true,
+                liveRegion: aim == null,
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Column(

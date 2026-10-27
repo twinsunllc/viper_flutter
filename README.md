@@ -187,14 +187,17 @@ its label and tuck and hide as actions.
 
 The app can open Viper, or bring back a launcher the tester hid, from a trigger of its own. Both
 live in `markers.dart`, so shared code calls them; they do nothing until `Viper.start` runs, and
-fold to nothing in a build without the VIPER define.
+fold to nothing in a build without the VIPER define. Called while Viper is still starting, they
+happen once it's ready; `Viper.open()` while Viper can't be reached says so and tries again, rather
+than opening on its own later.
 
 - `Viper.open()` shows the launcher if it was hidden and opens the sheet, as a tap on the launcher
   does: a "Report a bug" row.
 - `Viper.show()` brings a hidden launcher back, remembered per install like hiding.
 
 Say so in `Viper.start` with `revealHint`, the words a tester reads when they hide Viper. With it,
-**Hide Viper** is offered even where there's no shake (the iOS simulator, a project with shake off):
+**Hide Viper** is offered even where there's no shake (the iOS simulator, a project with shake off).
+A build that drops the hint, on a phone with no shake, shows a launcher an earlier build hid:
 
 ```dart
 Viper.start(

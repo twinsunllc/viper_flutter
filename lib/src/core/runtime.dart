@@ -400,8 +400,10 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
 
   /// A shake opens Viper, hidden or not (D335), where the project has shake on.
   Future<void> _listenForShake() async {
-    if (!_shakeOn) return;
-    shakeAvailable = await services.native.startShake(onShake);
+    if (_shakeOn) shakeAvailable = await services.native.startShake(onShake);
+    // Hidden in an earlier build or setting that had a way back this one lacks (no shake, no
+    // revealHint): shown again, so Viper is never hidden for good (D335, D371).
+    if (layout.hidden && !canHide) setHidden(false);
     if (!shakeAvailable) return;
     // The panel heard "no shake" if it was ready first: tell it again.
     if (_sentShake == false) send(bridgeMessage());
@@ -483,6 +485,10 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   void _setPhase(ViperPhase next) {
     phase = next;
     if (next == ViperPhase.unsupported || next == ViperPhase.refused) onStop?.call();
+    // Viper won't run after all: a show or open the app asked for while it started never comes.
+    if (next == ViperPhase.unsupported || next == ViperPhase.refused || next == ViperPhase.off) {
+      _showWhenReady = _openWhenReady = false;
+    }
     notifyListeners();
   }
 

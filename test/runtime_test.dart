@@ -256,6 +256,40 @@ void main() {
       },
     );
 
+    testWidgets('hidden in a build with a way back this one lacks, Viper shows again (D335, D371)', (tester) async {
+      final config = exampleConfig();
+      (config['project']! as Map)['shake_to_open'] = false;
+      final (h, runtime) = await started(
+        tester,
+        harness: Harness(
+          view: tester.view,
+          outcome: ConfigOk(config),
+          store: MemoryStore({'viper.hbr_loc_9w.launcher': '{"hidden":true}'}),
+        ),
+      );
+      await ready(tester, h);
+      expect(runtime.canHide, isFalse);
+      expect(runtime.layout.hidden, isFalse);
+    });
+
+    testWidgets('with a way back from the app, a hidden Viper stays hidden even without a shake (D371)', (
+      tester,
+    ) async {
+      final config = exampleConfig();
+      (config['project']! as Map)['shake_to_open'] = false;
+      final (h, runtime) = await started(
+        tester,
+        harness: Harness(
+          view: tester.view,
+          outcome: ConfigOk(config),
+          revealHint: 'Tap Show Viper on Account.',
+          store: MemoryStore({'viper.hbr_loc_9w.launcher': '{"hidden":true}'}),
+        ),
+      );
+      await ready(tester, h);
+      expect(runtime.layout.hidden, isTrue);
+    });
+
     testWidgets("where Viper won't run, show and open do nothing (D338, D371)", (tester) async {
       phone(tester);
       final h = Harness(view: tester.view, device: iphone.copyWithVersion('16.3.1'));

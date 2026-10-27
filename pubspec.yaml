@@ -1,6 +1,6 @@
 name: viper_flutter
 description: "Viper for Flutter apps: report what's wrong on a staging build, with what was on screen, the logs and the device."
-version: 0.2.0
+version: 0.2.1
 homepage: https://github.com/twinsunllc/viper_flutter
 repository: https://github.com/twinsunllc/viper_flutter
 publish_to: none

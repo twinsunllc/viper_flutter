@@ -1,7 +1,7 @@
 # For apps that still build iOS with CocoaPods; Swift Package Manager uses Package.swift.
 Pod::Spec.new do |s|
   s.name             = 'viper_flutter'
-  s.version          = '0.2.0'
+  s.version          = '0.2.1'
   s.summary          = "Viper for Flutter apps: the screenshot and shake on iOS."
   s.description      = "Viper's native side for Flutter apps on iOS."
   s.homepage         = 'https://github.com/twinsunllc/viper_flutter'

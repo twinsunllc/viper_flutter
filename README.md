@@ -41,7 +41,7 @@ dependencies:
   viper_flutter:
     git:
       url: https://github.com/twinsunllc/viper_flutter.git
-      ref: flutter-v0.2.0
+      ref: flutter-v0.2.1
 ```
 
 Flutter 3.44 or later. iOS builds through Swift Package Manager or CocoaPods. Viper runs on iOS

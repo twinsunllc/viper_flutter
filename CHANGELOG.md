@@ -1,3 +1,12 @@
+## 0.2.1
+
+- Picking aims first (D374): while a finger is down, what lifting it would pick is outlined over
+  the app and named in the handle, and sliding moves the aim. A quick tap picks as before.
+- An app's own tap handlers (an `InkWell` or `GestureDetector` that isn't part of a control, the
+  way custom cards and rows are built) are picked as themselves, named by what they show.
+- A tap on nothing worth naming, such as the space between widgets, picks the whole screen.
+- The composer's thumbnail outlines what was picked (served by Viper, no package change needed).
+
 ## 0.2.0
 
 - The panel's storage is kept by the app (D372): the guest a tester declared, the notices they

@@ -130,6 +130,8 @@ class ActivityLog {
           'path': callPath(call.url, level),
           'status': call.status,
           'duration_ms': call.duration.inMilliseconds,
+          // When it finished, for the full log's time order (D359, D368).
+          'at_ms': call.started.add(call.duration).millisecondsSinceEpoch,
           'request_id': ?call.requestId,
           'error': ?call.error,
         },

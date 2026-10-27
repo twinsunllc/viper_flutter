@@ -47,6 +47,7 @@ void main() {
         'path': 'https://api.example.com/charges?card=4242',
         'status': 402,
         'duration_ms': 120,
+        'at_ms': DateTime.utc(2026, 10, 26, 19, 0, 0, 120).millisecondsSinceEpoch,
         'request_id': 'req-9',
       });
       expect(log.networkEntries(PrivacyLevel.strict).single['path'], 'https://api.example.com/charges');

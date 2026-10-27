@@ -278,6 +278,21 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   String get _stateKey => 'viper.$key.panel_state';
   String get _themeKey => 'viper.$key.theme';
 
+  /// The panel's own storage in this app (D372), per Viper host and environment key.
+  String get _panelStorageKey => 'viper.$key.panel_storage@${host.origin}';
+
+  /// What the panel keeps (its guest, the notices it showed, its filters), read before the panel
+  /// loads and handed over in viper:bridge. Android's web view loses localStorage when the app is
+  /// killed, so the panel keeps it here instead (D372).
+  final Map<String, String> panelStorage = <String, String>{};
+
+  /// Each write waits for the one before, so the last write always lands last.
+  Future<void> _panelStorageWrite = Future<void>.value();
+
+  /// Whether the panel may keep [key] here: its own keys, never the panel token, which stays in
+  /// the web view (D328, D372).
+  static bool keepsInApp(String key) => key.startsWith('viper.') && !key.startsWith('viper.session.');
+
   /// The panel's URL from the config: its origin is the one the web view may load and the sign-in
   /// view may open, so both checks agree.
   Uri? panelUrl;
@@ -368,6 +383,13 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     config = ok;
     project = ProjectPlacement.fromJson(ok['launcher']);
     layout = LauncherLayout.restore(await services.store.readJson(_launcherKey), project);
+    final kept = await services.store.readJson(_panelStorageKey);
+    panelStorage
+      ..clear()
+      ..addAll({
+        for (final entry in (kept ?? const <String, Object?>{}).entries)
+          if (entry.value is String && keepsInApp(entry.key)) entry.key: entry.value! as String,
+      });
     final urls = ok['urls'];
     final panelUrl = urls is Map && urls['panel'] is String ? Uri.tryParse(urls['panel'] as String) : null;
     this.panelUrl = panelUrl;
@@ -609,6 +631,8 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
         }
       case 'viper:viewer':
         staff = message['staff'] == true;
+      case 'viper:storage:set':
+        _keepForPanel(message['key'], message['value']);
       case 'viper:theme':
         final next = message['theme'];
         if (next is String && const {'system', 'light', 'dark'}.contains(next) && next != theme) {
@@ -706,8 +730,29 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
       'os': facts?.os == 'Android' ? 'Android' : 'iOS',
       'shake': shakeAvailable && _shakeOn,
       'text_scale': roundForPayload(MediaQueryData.fromView(view).textScaler.scale(100) / 100),
+      'storage': Map<String, String>.of(panelStorage),
     };
   }
+
+  /// viper:storage:set (D372): the panel keeps [value] at [key], or removes it, written at once
+  /// so a kill right after loses nothing.
+  void _keepForPanel(Object? key, Object? value) {
+    if (key is! String || !keepsInApp(key) || (value != null && value is! String)) return;
+    if (value == null) {
+      if (panelStorage.remove(key) == null) return;
+    } else {
+      if (panelStorage[key] == value) return;
+      panelStorage[key] = value as String;
+    }
+    final snapshot = Map<String, Object?>.of(panelStorage);
+    _panelStorageWrite = _panelStorageWrite
+        .then((_) => services.store.writeJson(_panelStorageKey, snapshot))
+        .catchError((Object error) => services.log('the panel storage did not save ($error)'));
+  }
+
+  /// The panel's storage on the phone, written (for tests).
+  @visibleForTesting
+  Future<void> get panelStorageSaved => _panelStorageWrite;
 
   bool get _shakeOn {
     final projectConfig = config?['project'];

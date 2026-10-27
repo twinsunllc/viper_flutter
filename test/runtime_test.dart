@@ -146,6 +146,7 @@ void main() {
         'os': 'iOS',
         'shake': true,
         'text_scale': 1.0,
+        'storage': <String, String>{},
       });
       expect((sent[1]['state']! as Map)['view'], 'compose');
       expect(sent[1]['screen'], {'route': '/', 'url': '', 'title': 'Home', 'build': '0.1.0+1'});
@@ -160,6 +161,62 @@ void main() {
       for (final message in sent) {
         writeFixture('LoaderToPanelMessage', (message['type']! as String).substring('viper:'.length), message);
       }
+    });
+
+    testWidgets("the panel's storage is kept in the app and handed back after a relaunch (D372)", (tester) async {
+      final store = MemoryStore();
+      final (h, runtime) = await started(
+        tester,
+        harness: Harness(view: tester.view, store: store),
+      );
+      await ready(tester, h);
+      const guest = '{"token":"gst_1","name":"Kalani","email":"kalani@example.com"}';
+      h.panel!.post({'type': 'viper:storage:set', 'key': 'viper.guest.hbr_loc_9w', 'value': guest});
+      h.panel!.post({'type': 'viper:storage:set', 'key': 'viper.notice.hbr_loc_9w', 'value': '2026-10-26'});
+      h.panel!.post({'type': 'viper:storage:set', 'key': 'viper.notice.hbr_loc_9w', 'value': null});
+      await runtime.panelStorageSaved;
+      final kept = await store.readJson('viper.hbr_loc_9w.panel_storage@http://localhost:4830');
+      expect(kept, {'viper.guest.hbr_loc_9w': guest});
+
+      // The app is killed and opened again: a new runtime on the same store.
+      final (h2, _) = await started(
+        tester,
+        harness: Harness(view: tester.view, store: store),
+      );
+      await ready(tester, h2);
+      final bridge = h2.panel!.of('viper:bridge').single;
+      expect(bridge['storage'], {'viper.guest.hbr_loc_9w': guest});
+    });
+
+    testWidgets('the panel token never reaches the app store, nor anything but its own keys (D328, D372)', (
+      tester,
+    ) async {
+      final store = MemoryStore();
+      final (h, runtime) = await started(
+        tester,
+        harness: Harness(view: tester.view, store: store),
+      );
+      await ready(tester, h);
+      h.panel!.post({'type': 'viper:storage:set', 'key': 'viper.session.hbr_loc_9w', 'value': '{"token":"pt_1"}'});
+      h.panel!.post({'type': 'viper:storage:set', 'key': 'someone.else', 'value': 'x'});
+      h.panel!.post({'type': 'viper:storage:set', 'key': 'viper.filter.hbr_loc_9w', 'value': 42});
+      await runtime.panelStorageSaved;
+      expect(runtime.panelStorage, isEmpty);
+      expect(store.values.keys.where((k) => k.contains('panel_storage')), isEmpty);
+      expect(ViperRuntime.keepsInApp('viper.session.hbr_loc_9w'), isFalse);
+      expect(ViperRuntime.keepsInApp('viper.guest.hbr_loc_9w'), isTrue);
+    });
+
+    testWidgets("another Viper host's storage stays its own (D372)", (tester) async {
+      final store = MemoryStore({
+        'viper.hbr_loc_9w.panel_storage@https://viper-volatile.twinsun.dev': '{"viper.guest.hbr_loc_9w":"elsewhere"}',
+      });
+      final (h, _) = await started(
+        tester,
+        harness: Harness(view: tester.view, store: store),
+      );
+      await ready(tester, h);
+      expect(h.panel!.of('viper:bridge').single['storage'], <String, String>{});
     });
 
     testWidgets('a shake opens Viper, and shows it again when hidden (D335)', (tester) async {

@@ -1,5 +1,8 @@
 ## Unreleased
 
+- The panel's storage is kept by the app (D372): the guest a tester declared, the notices they
+  dismissed and their filters survive the app being killed, relaunched or updated, which Android's
+  web view storage didn't. The panel token stays in the web view.
 - `Viper.open()` and `Viper.show()` in `markers.dart`: the app opens Viper, or brings back a hidden
   launcher, from its own trigger (a menu row, a logo long press, a deep link). `Viper.start` takes
   `revealHint`, the words a tester reads when hiding Viper; with it, Hide Viper is offered without

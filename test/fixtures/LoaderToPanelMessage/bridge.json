@@ -4,5 +4,6 @@
   "app_id": "dev.twinsun.viper.example",
   "os": "iOS",
   "shake": true,
-  "text_scale": 1.0
+  "text_scale": 1.0,
+  "storage": {}
 }

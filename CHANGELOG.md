@@ -4,7 +4,11 @@
   the app and named in the handle, and sliding moves the aim. A quick tap picks as before.
 - An app's own tap handlers (an `InkWell` or `GestureDetector` that isn't part of a control, the
   way custom cards and rows are built) are picked as themselves, named by what they show.
-- A tap on nothing worth naming, such as the space between widgets, picks the whole screen.
+  A tap handler covering most of the screen (a page wrapped to put the keyboard away) is the page.
+- A tap on nothing worth naming, such as the space between widgets, picks the whole screen, and so
+  does a blank tap inside a `ViperScreen`.
+- A pick on a `Scaffold` page no longer has a step above it named by all the page's words (the
+  body's `LayoutId` key is Flutter's, not the app's).
 - The composer's thumbnail outlines what was picked (served by Viper, no package change needed).
 
 ## 0.2.0

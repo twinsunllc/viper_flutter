@@ -90,7 +90,7 @@ class ScreenTracker {
   }
 
   /// ScreenRef for where the person is now (D332). `url` is empty on a phone.
-  Map<String, Object?> current({String? build, PrivacyLevel level = PrivacyLevel.standard}) {
+  Map<String, Object?> current({String? build, String? commit, PrivacyLevel level = PrivacyLevel.standard}) {
     final page = topPage();
     final key = page == null ? '/' : screenKey(page);
     final surface = currentSurface(level: level);
@@ -99,6 +99,7 @@ class ScreenTracker {
       'url': '',
       'title': page == null ? 'Home' : screenName(page, key),
       'build': ?build,
+      'commit': ?commit,
       'surface': ?surface,
     };
   }

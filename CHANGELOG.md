@@ -1,5 +1,7 @@
 ## Unreleased
 
+- The `VIPER_COMMIT` define: the commit CI built from goes in the environment's `app.commit` and
+  every screen reference, so Viper can tell whether a tester has a fix (D356, D357).
 - The panel's sheet keeps its footer above the home indicator or gesture bar: a strip in the
   sheet's color takes the bottom safe area, and goes when the keyboard is up.
 

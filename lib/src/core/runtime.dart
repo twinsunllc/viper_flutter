@@ -365,7 +365,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     );
     unawaited(panel!.load(bridgeUrl(panelUrl)));
     _setPhase(ViperPhase.ready);
-    _screen = screens.current(build: facts?.build, level: _level);
+    _screen = screens.current(build: facts?.build, commit: facts?.commit, level: _level);
     _watchScreens();
     unawaited(_listenForShake());
     if (_identity == null && identityCallback != null) unawaited(_fetchIdentity());
@@ -606,7 +606,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     send({
       'type': 'viper:config',
       'config': config,
-      'screen': _screen ?? screens.current(build: facts?.build, level: _level),
+      'screen': _screen ?? screens.current(build: facts?.build, commit: facts?.commit, level: _level),
       'state': panelState,
     });
     send({'type': 'viper:identity', 'identity': _identity});
@@ -1061,7 +1061,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
         context: mergeContext(_context, _safeContext() ?? const {}),
       ),
     );
-    final screen = screens.current(build: facts!.build, level: _level);
+    final screen = screens.current(build: facts!.build, commit: facts!.commit, level: _level);
     return {
       ...report,
       'key': key,
@@ -1163,7 +1163,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   /// surface on it did (viper:surface): a dialog, a drawer, a tab.
   void _lookAgain() {
     if (phase != ViperPhase.ready || picking || capturing) return;
-    final next = screens.current(build: facts?.build, level: _level);
+    final next = screens.current(build: facts?.build, commit: facts?.commit, level: _level);
     final previous = _screen;
     _screen = next;
     if (previous == null || next['route'] != previous['route']) {

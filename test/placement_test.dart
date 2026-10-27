@@ -106,6 +106,16 @@ void main() {
     });
   });
 
+  group('the commit (D356)', () {
+    test("reads VIPER_COMMIT trimmed, and nothing when CI didn't write one", () {
+      expect(commitFrom(' 4f2a9c1e8b7d '), '4f2a9c1e8b7d');
+      expect(commitFrom(''), isNull);
+      expect(commitFrom('   '), isNull);
+      // A test run is given no define.
+      expect(viperCommitDefine, '');
+    });
+  });
+
   group('the sheet', () {
     test('is 82% of the screen, at most 720, and never above the safe area', () {
       expect(sheetHeight(height: 852, top: 59, keyboard: 0), closeTo(698.64, 0.01));

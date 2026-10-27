@@ -97,6 +97,7 @@ Map<String, Object?> deviceEnvironment({
     'app': {
       'id': facts.appId,
       'build': facts.build,
+      'commit': ?facts.commit,
       'flutter_version': ?FlutterVersion.version,
       'environment': ?app.environment,
       'user_id': ?app.userId,

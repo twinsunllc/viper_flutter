@@ -60,6 +60,11 @@ Viper is in a build only when that build asks for it, twice over:
    `"VIPER": true` in the staging flavor's dart-define file only (or pass
    `--dart-define=VIPER=true`). Without it the markers fold to their child and the compiler drops
    the rest.
+3. **The `VIPER_COMMIT` define (D356).** CI writes the head commit beside `VIPER` in the staging
+   flavor's dart-define file (`"VIPER_COMMIT": "<git rev-parse HEAD>"`, or
+   `--dart-define=VIPER_COMMIT=$(git rev-parse HEAD)`). Viper tells from it whether a tester has a
+   fix (D353, D357): "The fix is in build 1041. Update in TestFlight." Without it, Viper names the
+   build by the app's own build string only and holds nothing.
 
 ```dart
 // lib/main_staging.dart: the only file that imports the implementation.

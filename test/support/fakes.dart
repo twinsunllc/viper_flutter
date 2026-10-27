@@ -346,6 +346,7 @@ extension DeviceFactsCopy on DeviceFacts {
     physical: physical,
     appId: appId,
     build: build,
+    commit: commit,
   );
 
   /// The same Android phone on API [sdk].
@@ -358,6 +359,7 @@ extension DeviceFactsCopy on DeviceFacts {
     physical: physical,
     appId: appId,
     build: build,
+    commit: commit,
   );
 }
 
@@ -370,11 +372,12 @@ class FixedScreens extends ScreenTracker {
   final String route;
 
   @override
-  Map<String, Object?> current({String? build, PrivacyLevel level = PrivacyLevel.standard}) => {
+  Map<String, Object?> current({String? build, String? commit, PrivacyLevel level = PrivacyLevel.standard}) => {
     'route': route,
     'url': '',
     'title': displayName(route),
     'build': ?build,
+    'commit': ?commit,
   };
 }
 
@@ -388,4 +391,18 @@ DeviceFacts onBuild(DeviceFacts facts, String build) => DeviceFacts(
   physical: facts.physical,
   appId: facts.appId,
   build: build,
+  commit: facts.commit,
+);
+
+/// A phone on [build], made from [commit] (CI's `VIPER_COMMIT`, D356).
+DeviceFacts onCommit(DeviceFacts facts, String build, String commit) => DeviceFacts(
+  os: facts.os,
+  osVersion: facts.osVersion,
+  sdkInt: facts.sdkInt,
+  model: facts.model,
+  manufacturer: facts.manufacturer,
+  physical: facts.physical,
+  appId: facts.appId,
+  build: build,
+  commit: commit,
 );

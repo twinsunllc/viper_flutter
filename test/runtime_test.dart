@@ -389,6 +389,29 @@ void main() {
       ]);
     });
 
+    testWidgets('a build made with VIPER_COMMIT names its commit in the screen and the environment (D356)', (tester) async {
+      phone(tester);
+      final (h, _) = await started(
+        tester,
+        harness: Harness(view: tester.view, device: onCommit(iphone, '1.0.0+1', '4f2a9c1e8b7d')),
+      );
+      await ready(tester, h);
+      final config = h.panel!.of('viper:config').single;
+      expect(config['screen'], {'route': '/', 'url': '', 'title': 'Home', 'build': '1.0.0+1', 'commit': '4f2a9c1e8b7d'});
+      final env = deviceEnvironment(
+        facts: onCommit(iphone, '1.0.0+1', '4f2a9c1e8b7d'),
+        view: tester.view,
+        connection: 'wifi',
+        screenshot: const ScreenshotInfo(method: 'native'),
+        capturedAt: Harness.now,
+        appOpen: const Duration(minutes: 1),
+        timezone: 'America/Los_Angeles',
+        app: const AppDetails(environment: 'staging'),
+      );
+      expect((env['app']! as Map)['commit'], '4f2a9c1e8b7d');
+      expect((env['app']! as Map)['build'], '1.0.0+1');
+    });
+
     testWidgets('the device environment of a capture taken natively on an iPhone (D27, D338)', (tester) async {
       phone(tester);
       // The capture the Rails portal specs show: build 2.4.0+311, the picture taken on the phone, a

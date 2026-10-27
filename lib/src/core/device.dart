@@ -6,6 +6,16 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+/// The head commit this build was made from (D356): CI writes `VIPER_COMMIT` into the staging
+/// flavor's dart-define file beside `VIPER`. Empty when it didn't.
+const String viperCommitDefine = String.fromEnvironment('VIPER_COMMIT');
+
+/// [viperCommitDefine] trimmed, or null when CI didn't write one.
+String? commitFrom(String define) {
+  final commit = define.trim();
+  return commit.isEmpty ? null : commit;
+}
+
 /// The phone and the app, read once.
 class DeviceFacts {
   /// The facts.
@@ -17,6 +27,7 @@ class DeviceFacts {
     required this.physical,
     required this.appId,
     required this.build,
+    this.commit,
     this.sdkInt,
   });
 
@@ -43,6 +54,10 @@ class DeviceFacts {
 
   /// `<version>+<build number>`, the build string (flutter.md, D103).
   final String build;
+
+  /// The head commit the build was made from, from `VIPER_COMMIT` (D356); null without one. Viper
+  /// tells from it whether the person has a fix (D353, D357); [build] stays the name people see.
+  final String? commit;
 
   /// Viper runs on iOS 16.4 and up and Android 7 (API 24) and up (D338).
   bool get supported {
@@ -104,6 +119,7 @@ class PluginDevice implements ViperDevice {
         physical: ios.isPhysicalDevice,
         appId: package.packageName,
         build: build,
+        commit: commitFrom(viperCommitDefine),
       );
     }
     if (Platform.isAndroid) {
@@ -117,6 +133,7 @@ class PluginDevice implements ViperDevice {
         physical: android.isPhysicalDevice,
         appId: package.packageName,
         build: build,
+        commit: commitFrom(viperCommitDefine),
       );
     }
     return DeviceFacts(
@@ -127,6 +144,7 @@ class PluginDevice implements ViperDevice {
       physical: true,
       appId: package.packageName,
       build: build,
+      commit: commitFrom(viperCommitDefine),
     );
   }
 

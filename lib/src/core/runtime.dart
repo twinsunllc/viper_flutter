@@ -177,8 +177,8 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   String get hiddenToast =>
       revealHint == null ? 'Viper is hidden. Shake your phone to bring it back.' : 'Viper is hidden. $revealHint';
 
-  /// Still asking the phone and Viper, or waiting to ask again: Viper may yet run.
-  bool get _notReadyYet => phase == ViperPhase.starting || phase == ViperPhase.unreachable;
+  /// What a tester is told when the app opens Viper while it can't reach Viper.
+  static const String unreachableToast = "Viper can't be reached right now. Try again in a moment.";
 
   /// Viper.show or Viper.open called after start but before Viper was ready: done once it is.
   bool _showWhenReady = false;
@@ -412,7 +412,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   /// Before Viper is ready it waits until it is; where Viper won't run it does nothing.
   @override
   void show() {
-    if (_notReadyYet) {
+    if (phase == ViperPhase.starting || phase == ViperPhase.unreachable) {
       _showWhenReady = true;
       return;
     }
@@ -421,11 +421,20 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   }
 
   /// The app's own way in (D371): shows the launcher if hidden and opens the sheet, as a tap on
-  /// the launcher or a shake does. Never while picking, where the sheet is the handle.
+  /// the launcher or a shake does. Never while picking, where the sheet is the handle. While Viper
+  /// starts, it opens once ready; while Viper can't be reached it says so and asks again now,
+  /// rather than opening on its own minutes later, mid-task (a show is still kept).
   @override
   void open() {
-    if (_notReadyYet) {
+    if (phase == ViperPhase.starting) {
       _openWhenReady = true;
+      return;
+    }
+    if (phase == ViperPhase.unreachable) {
+      _showWhenReady = true;
+      showToast(unreachableToast);
+      _retry?.cancel();
+      unawaited(_askConfig());
       return;
     }
     if (phase != ViperPhase.ready) return;

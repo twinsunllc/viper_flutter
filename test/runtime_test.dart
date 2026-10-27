@@ -211,6 +211,51 @@ void main() {
       expect(runtime.sheetOpen, isTrue);
     });
 
+    testWidgets('Viper.show called while Viper is still starting shows it once ready (D371)', (tester) async {
+      phone(tester);
+      final h = Harness(view: tester.view, store: MemoryStore({'viper.hbr_loc_9w.launcher': '{"hidden":true}'}));
+      final runtime = h.runtime();
+      addTearDown(runtime.dispose);
+      runtime.show();
+      await runtime.boot();
+      await tester.pump();
+      expect(runtime.layout.hidden, isFalse);
+      expect(runtime.sheetOpen, isFalse);
+    });
+
+    testWidgets('Viper.open with the sheet already open leaves it open (D371)', (tester) async {
+      final (h, runtime) = await started(tester);
+      await ready(tester, h);
+      runtime.open();
+      runtime.open();
+      expect(runtime.sheetOpen, isTrue);
+    });
+
+    testWidgets(
+      "Viper.open while Viper can't be reached says so and asks again, and never opens on its own later (D371)",
+      (tester) async {
+        final (h, runtime) = await started(
+          tester,
+          harness: Harness(
+            view: tester.view,
+            outcome: const ConfigUnreachable('offline'),
+            store: MemoryStore({'viper.hbr_loc_9w.launcher': '{"hidden":true}'}),
+          ),
+        );
+        expect(runtime.phase, ViperPhase.unreachable);
+        h.api.outcome = ConfigOk(exampleConfig());
+        runtime.open();
+        expect(runtime.toast, ViperRuntime.unreachableToast);
+        await tester.pump();
+        expect(h.api.calls, 2, reason: 'asked again at once');
+        expect(runtime.phase, ViperPhase.ready);
+        // The show it carried is kept; the open isn't.
+        expect(runtime.layout.hidden, isFalse);
+        expect(runtime.sheetOpen, isFalse);
+        await tester.pump(const Duration(seconds: 5));
+      },
+    );
+
     testWidgets("where Viper won't run, show and open do nothing (D338, D371)", (tester) async {
       phone(tester);
       final h = Harness(view: tester.view, device: iphone.copyWithVersion('16.3.1'));

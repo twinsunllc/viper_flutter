@@ -36,7 +36,8 @@ class ViperHost extends StatelessWidget {
                       offstage: runtime.capturing,
                       child: _ViperLayer(runtime: runtime),
                     )
-                  : const SizedBox.shrink(),
+                  // Not running yet: only a note, such as Viper.open's while Viper can't be reached.
+                  : Stack(children: [ViperToastLayer(runtime: runtime)]),
             ),
           ),
         ],

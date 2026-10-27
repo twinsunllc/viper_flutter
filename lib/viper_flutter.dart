@@ -91,4 +91,10 @@ abstract final class Viper {
 
   /// See `Viper.context` in markers.dart.
   static void context(Map<String, Object?> values) => markers.Viper.context(values);
+
+  /// See `Viper.show` in markers.dart.
+  static void show() => markers.Viper.show();
+
+  /// See `Viper.open` in markers.dart.
+  static void open() => markers.Viper.open();
 }

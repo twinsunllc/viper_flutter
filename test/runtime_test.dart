@@ -172,6 +172,58 @@ void main() {
       expect(runtime.sheetOpen, isTrue);
     });
 
+    testWidgets("the app's Viper.show brings a hidden launcher back, remembered per install (D371)", (tester) async {
+      final (h, runtime) = await started(tester);
+      await ready(tester, h);
+      runtime.setHidden(true);
+      runtime.show();
+      expect(runtime.layout.hidden, isFalse);
+      expect(runtime.sheetOpen, isFalse);
+      expect(await h.store.readJson('viper.hbr_loc_9w.launcher'), containsPair('hidden', false));
+    });
+
+    testWidgets("the app's Viper.open shows a hidden launcher and opens the sheet, never while picking (D371)", (
+      tester,
+    ) async {
+      final (h, runtime) = await started(tester);
+      await ready(tester, h);
+      runtime.setHidden(true);
+      runtime.open();
+      expect(runtime.layout.hidden, isFalse);
+      expect(runtime.sheetOpen, isTrue);
+      runtime.picking = true;
+      runtime.closeSheet();
+      runtime.picking = true;
+      runtime.open();
+      expect(runtime.sheetOpen, isFalse, reason: 'picking, the sheet is the handle');
+    });
+
+    testWidgets('Viper.open called while Viper is still starting opens it once ready (D371)', (tester) async {
+      phone(tester);
+      final h = Harness(view: tester.view);
+      final runtime = h.runtime();
+      addTearDown(runtime.dispose);
+      runtime.open();
+      expect(runtime.sheetOpen, isFalse);
+      await runtime.boot();
+      await tester.pump();
+      expect(runtime.phase, ViperPhase.ready);
+      expect(runtime.sheetOpen, isTrue);
+    });
+
+    testWidgets("where Viper won't run, show and open do nothing (D338, D371)", (tester) async {
+      phone(tester);
+      final h = Harness(view: tester.view, device: iphone.copyWithVersion('16.3.1'));
+      final runtime = h.runtime();
+      addTearDown(runtime.dispose);
+      await runtime.boot();
+      runtime.show();
+      runtime.open();
+      expect(runtime.phase, ViperPhase.unsupported);
+      expect(runtime.sheetOpen, isFalse);
+      expect(await h.store.readJson('viper.hbr_loc_9w.launcher'), isNull);
+    });
+
     testWidgets("a project with shake off never listens, and doesn't offer hiding (D335)", (tester) async {
       final config = exampleConfig();
       (config['project']! as Map)['shake_to_open'] = false;

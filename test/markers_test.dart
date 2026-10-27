@@ -32,6 +32,12 @@ class RecordingHandler implements ViperSlotHandler {
 
   @override
   void routesChanged(ViperNavigatorObserver observer) => calls.add('routes');
+
+  @override
+  void show() => calls.add('show');
+
+  @override
+  void open() => calls.add('open');
 }
 
 class Counter extends StatefulWidget {
@@ -69,12 +75,14 @@ void main() {
       expect(Viper.observer().runtimeType, NavigatorObserver);
     });
 
-    test('identify, context and recordError do nothing', () {
+    test('identify, context, recordError, show and open do nothing', () {
       final handler = RecordingHandler();
       ViperSlots.handler.value = handler;
       Viper.identify({'v': 1});
       Viper.context({'plan': 'pro'});
       Viper.recordError(StateError('x'), null);
+      Viper.show();
+      Viper.open();
       expect(handler.calls, isEmpty);
       expect(ViperSlots.pendingContext, isEmpty);
     });
@@ -115,13 +123,23 @@ void main() {
       expect(ViperSlots.pendingContext, {'plan': 'pro'});
     });
 
+    test('show and open before start do nothing, and are never kept for later (D371)', () {
+      Viper.show();
+      Viper.open();
+      final handler = RecordingHandler();
+      ViperSlots.handler.value = handler;
+      expect(handler.calls, isEmpty);
+    });
+
     test('after start, every call reaches the handler', () {
       final handler = RecordingHandler();
       ViperSlots.handler.value = handler;
       Viper.identify({'v': 1});
       Viper.context({'plan': 'pro'});
       Viper.recordError('boom', StackTrace.empty);
-      expect(handler.calls, ['identify 1', 'context {plan: pro}', 'error boom']);
+      Viper.show();
+      Viper.open();
+      expect(handler.calls, ['identify 1', 'context {plan: pro}', 'error boom', 'show', 'open']);
     });
 
     testWidgets('an observer tells the handler when its navigator changes', (tester) async {

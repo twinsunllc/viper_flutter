@@ -163,6 +163,13 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   /// What the app adds to each capture, beside `Viper.context` (D27).
   final Map<String, Object?> Function()? contextCallback;
 
+  /// Still asking the phone and Viper, or waiting to ask again: Viper may yet run.
+  bool get _notReadyYet => phase == ViperPhase.starting || phase == ViperPhase.unreachable;
+
+  /// Viper.show or Viper.open called after start but before Viper was ready: done once it is.
+  bool _showWhenReady = false;
+  bool _openWhenReady = false;
+
   /// Everything outside the runtime.
   final ViperServices services;
 
@@ -365,6 +372,12 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     );
     unawaited(panel!.load(bridgeUrl(panelUrl)));
     _setPhase(ViperPhase.ready);
+    if (_openWhenReady) {
+      open();
+    } else if (_showWhenReady) {
+      show();
+    }
+    _showWhenReady = _openWhenReady = false;
     _screen = screens.current(build: facts?.build, commit: facts?.commit, level: _level);
     _watchScreens();
     unawaited(_listenForShake());
@@ -379,6 +392,32 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     // The panel heard "no shake" if it was ready first: tell it again.
     if (_sentShake == false) send(bridgeMessage());
     notifyListeners();
+  }
+
+  /// The app's own way back (D371): the launcher shows again if hidden, remembered per install.
+  /// Before Viper is ready it waits until it is; where Viper won't run it does nothing.
+  @override
+  void show() {
+    if (_notReadyYet) {
+      _showWhenReady = true;
+      return;
+    }
+    if (phase != ViperPhase.ready) return;
+    if (layout.hidden) setHidden(false);
+  }
+
+  /// The app's own way in (D371): shows the launcher if hidden and opens the sheet, as a tap on
+  /// the launcher or a shake does. Never while picking, where the sheet is the handle.
+  @override
+  void open() {
+    if (_notReadyYet) {
+      _openWhenReady = true;
+      return;
+    }
+    if (phase != ViperPhase.ready) return;
+    if (layout.hidden) setHidden(false);
+    if (picking) return;
+    openSheet();
   }
 
   /// The phone was shaken: Viper shows again if it was hidden, and opens.

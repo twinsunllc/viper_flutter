@@ -29,6 +29,13 @@ abstract interface class ViperSlotHandler {
 
   /// A navigator an observer watches changed its routes.
   void routesChanged(ViperNavigatorObserver observer);
+
+  /// The app's own way back (D371): a hidden launcher shows again, remembered per install.
+  void show();
+
+  /// The app's own way in (D371): shows the launcher if hidden and opens the sheet, as a tap on
+  /// the launcher does.
+  void open();
 }
 
 /// The slots, empty until Viper.start fills them.

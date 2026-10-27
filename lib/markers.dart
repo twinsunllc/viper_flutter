@@ -1,5 +1,5 @@
 /// What an app's shared code calls (D336): `Viper.wrap`, `Viper.observer()`, `Viper.recordError`,
-/// `Viper.identify`, `Viper.context`, and the marker widgets `ViperScreen`, `ViperPrivate` and
+/// `Viper.identify`, `Viper.context`, `Viper.show`, `Viper.open`, and the marker widgets `ViperScreen`, `ViperPrivate` and
 /// `ViperUnmask`. Each is a pass-through until the staging entry point calls `Viper.start` from
 /// `package:viper_flutter/viper_flutter.dart`, and folds to nothing in any build without
 /// `--dart-define=VIPER=true`.
@@ -61,6 +61,22 @@ abstract final class Viper {
       return;
     }
     ViperSlots.pendingContext.addAll(values);
+  }
+
+  /// Brings a hidden launcher back, from the app's own trigger (D371): a debug menu row, a long
+  /// press on the logo, a deep link. Remembered per install, like hiding. Does nothing until
+  /// `Viper.start` runs, and in a build without the VIPER define.
+  static void show() {
+    if (!viperDefined) return;
+    ViperSlots.handler.value?.show();
+  }
+
+  /// Opens Viper from the app's own trigger (D371), a "Report a bug" row for one: shows the
+  /// launcher if it was hidden and opens the sheet, as a tap on the launcher does. Does nothing
+  /// until `Viper.start` runs, and in a build without the VIPER define.
+  static void open() {
+    if (!viperDefined) return;
+    ViperSlots.handler.value?.open();
   }
 }
 

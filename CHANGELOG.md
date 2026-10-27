@@ -1,4 +1,4 @@
-## Unreleased
+## 0.2.0
 
 - The panel's storage is kept by the app (D372): the guest a tester declared, the notices they
   dismissed and their filters survive the app being killed, relaunched or updated, which Android's
@@ -12,7 +12,7 @@
 - The panel's sheet keeps its footer above the home indicator or gesture bar: a strip in the
   sheet's color takes the bottom safe area, and goes when the keyboard is up.
 
-## 0.1.0 (unreleased)
+## 0.1.0
 
 - `Viper.start`, the config call and the OS floor (iOS 16.4, Android API 24).
 - `Viper.wrap` with the launcher (dragged to eight spots, tucked to an edge tab, hidden) and the

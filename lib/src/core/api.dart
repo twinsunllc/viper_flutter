@@ -12,7 +12,7 @@ import 'dart:io';
 const String implementationMarker = 'viper-flutter-implementation';
 
 /// This package's version, as `pubspec.yaml` says.
-const String packageVersion = '0.1.0';
+const String packageVersion = '0.2.0';
 
 /// The `X-Viper-Client` header: the marker and the version.
 const String clientHeader = '$implementationMarker/$packageVersion';

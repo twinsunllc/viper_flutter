@@ -202,8 +202,14 @@ bool meaningful(Widget widget) {
   if (widget is ViperScreen) return true;
   final name = widget.runtimeType.toString();
   if (_nouns.containsKey(name)) return true;
-  return widget.key is ValueKey && !name.startsWith('_');
+  final key = widget.key;
+  return key is ValueKey && !name.startsWith('_') && !_frameworkKey(widget, key);
 }
+
+/// A key Flutter gives a widget itself, not one the app chose: a LayoutId is keyed by its slot
+/// (Scaffold's body is `_ScaffoldSlot.body`), which would name every page body by all its words.
+bool _frameworkKey(Widget widget, ValueKey<Object?> key) =>
+    widget is LayoutId || key.value.runtimeType.toString().startsWith('_');
 
 /// What an element is worth naming: a [meaningful] widget, or a tap handler of the app's own
 /// (a custom card or row), never one that's part of a control (a button's own InkWell).

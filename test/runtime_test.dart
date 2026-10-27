@@ -389,7 +389,9 @@ void main() {
       ]);
     });
 
-    testWidgets('a build made with VIPER_COMMIT names its commit in the screen and the environment (D356)', (tester) async {
+    testWidgets('a build made with VIPER_COMMIT names its commit in the screen and the environment (D356)', (
+      tester,
+    ) async {
       phone(tester);
       final (h, _) = await started(
         tester,
@@ -397,7 +399,13 @@ void main() {
       );
       await ready(tester, h);
       final config = h.panel!.of('viper:config').single;
-      expect(config['screen'], {'route': '/', 'url': '', 'title': 'Home', 'build': '1.0.0+1', 'commit': '4f2a9c1e8b7d'});
+      expect(config['screen'], {
+        'route': '/',
+        'url': '',
+        'title': 'Home',
+        'build': '1.0.0+1',
+        'commit': '4f2a9c1e8b7d',
+      });
       final env = deviceEnvironment(
         facts: onCommit(iphone, '1.0.0+1', '4f2a9c1e8b7d'),
         view: tester.view,

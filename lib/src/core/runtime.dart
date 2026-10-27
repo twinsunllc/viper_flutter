@@ -290,7 +290,8 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   Future<void> _panelStorageWrite = Future<void>.value();
 
   /// Whether the panel may keep [key] here: its own keys, never the panel token, which stays in
-  /// the web view (D328, D372).
+  /// the web view (D328, D372). The panel's `webViewOnly` (widget/src/panel/storage.ts) holds the
+  /// same rule on its side.
   static bool keepsInApp(String key) => key.startsWith('viper.') && !key.startsWith('viper.session.');
 
   /// The panel's URL from the config: its origin is the one the web view may load and the sign-in

@@ -177,10 +177,56 @@ above the app's bottom navigation bar or tab bar and the bottom safe area (D351)
 raise wins. Drag it to any of the eight spots; long press to tuck it to an edge tab (and back), or
 to **Hide Viper**. Shaking the phone opens Viper, hidden or not; a project can turn shake off in its
 settings, and then hiding isn't offered, nor where the phone can't feel a shake (the iOS simulator
-has no accelerometer; on the Android emulator, shake it from Extended controls > Virtual sensors). Where it sits
+has no accelerometer; on the Android emulator, shake it from Extended controls > Virtual sensors),
+unless the app has its own way back (below). Where it sits
 and whether it's hidden are remembered per install, and turning the phone or resizing an iPad split
 view puts it back on its spot. It reads as one button to VoiceOver and TalkBack, with the counts in
 its label and tuck and hide as actions.
+
+### Bringing Viper back (D371)
+
+The app can open Viper, or bring back a launcher the tester hid, from a trigger of its own. Both
+live in `markers.dart`, so shared code calls them; they do nothing until `Viper.start` runs, and
+fold to nothing in a build without the VIPER define.
+
+- `Viper.open()` shows the launcher if it was hidden and opens the sheet, as a tap on the launcher
+  does: a "Report a bug" row.
+- `Viper.show()` brings a hidden launcher back, remembered per install like hiding.
+
+Say so in `Viper.start` with `revealHint`, the words a tester reads when they hide Viper. With it,
+**Hide Viper** is offered even where there's no shake (the iOS simulator, a project with shake off):
+
+```dart
+Viper.start(
+  key: 'vk_...',
+  host: Uri.parse('https://viper-volatile.twinsun.dev'),
+  revealHint: 'Long-press the logo on Account to bring it back.',
+);
+```
+
+A row in a debug or settings menu, shown only where Viper is in the build:
+
+```dart
+if (viperDefined)
+  ListTile(title: const Text('Report a bug'), onTap: Viper.open),
+```
+
+A long press on the app's logo:
+
+```dart
+GestureDetector(onLongPress: Viper.show, child: const AppLogo());
+```
+
+A deep link, from whatever router the app uses (`myapp-staging://viper` here):
+
+```dart
+GoRoute(path: '/viper', redirect: (context, state) {
+  Viper.open();
+  return '/';
+});
+```
+
+The example app has both rows on its Account tab.
 
 The panel's web view is made once, as soon as Viper says the app is trusted, and kept for the life
 of the app, so it's ready when the launcher is tapped. The device log says how long it took:

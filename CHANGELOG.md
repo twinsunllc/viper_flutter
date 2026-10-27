@@ -1,5 +1,9 @@
 ## Unreleased
 
+- `Viper.open()` and `Viper.show()` in `markers.dart`: the app opens Viper, or brings back a hidden
+  launcher, from its own trigger (a menu row, a logo long press, a deep link). `Viper.start` takes
+  `revealHint`, the words a tester reads when hiding Viper; with it, Hide Viper is offered without
+  a shake (D371).
 - The `VIPER_COMMIT` define: the commit CI built from goes in the environment's `app.commit` and
   every screen reference, so Viper can tell whether a tester has a fix (D356, D357).
 - The panel's sheet keeps its footer above the home indicator or gesture bar: a strip in the

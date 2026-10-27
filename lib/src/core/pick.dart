@@ -225,7 +225,7 @@ bool _tappable(Widget widget) {
 }
 
 bool _ownTappable(Element element) {
-  if (!_tappable(element.widget)) return false;
+  if (!_tappable(element.widget) || _pageWide(element)) return false;
   var inside = false;
   element.visitAncestorElements((ancestor) {
     if (ancestor.widget is Navigator || ancestor.widget is Overlay) return false;
@@ -235,14 +235,28 @@ bool _ownTappable(Element element) {
   return !inside;
 }
 
+/// Whether a tap handler covers most of the screen: a page wrapped to put the keyboard away
+/// (`GestureDetector(onTap: unfocus, child: Scaffold(...))`) is the page, not a thing on it.
+/// The screen's size is read without depending on it, so the app's widget never rebuilds for it.
+bool _pageWide(Element element) {
+  final render = element.findRenderObject();
+  final screen = element.getInheritedWidgetOfExactType<MediaQuery>()?.data.size;
+  if (render is! RenderBox || !render.hasSize || screen == null || screen.isEmpty) return false;
+  return render.size.width >= screen.width * 0.9 && render.size.height >= screen.height * 0.6;
+}
+
 /// Whether a tap on [picked] lands on anything worth naming. When it doesn't (the space between
-/// widgets), the pick is the whole screen rather than a "Padding" or a "Column".
+/// widgets), the pick is the whole screen rather than a "Padding" or a "Column". The screen
+/// itself, a ViperScreen, is the whole screen too: it names the screen, not a thing on it.
 bool nameable(Element picked) {
-  if (meaningfulElement(picked)) return true;
+  bool named(Element element) => element.widget is! ViperScreen && meaningfulElement(element);
+  if (picked.widget is ViperScreen) return false;
+  if (named(picked)) return true;
   var found = false;
   picked.visitAncestorElements((ancestor) {
-    if (ancestor.widget is Navigator || ancestor.widget is Overlay) return false;
-    found = meaningfulElement(ancestor);
+    final widget = ancestor.widget;
+    if (widget is Navigator || widget is Overlay || widget is ViperScreen) return false;
+    found = named(ancestor);
     return !found;
   });
   return found;

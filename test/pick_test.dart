@@ -655,4 +655,58 @@ void main() {
     expect(none['scope'], 'screen');
     expect(none['label'], 'Whole screen');
   });
+
+  testWidgets('a page wrapped to put the keyboard away is the page: a blank tap there is still the whole screen', (
+    tester,
+  ) async {
+    final (h, _, _) = await pumpApp(
+      tester,
+      device: pixel9,
+      home: Builder(
+        builder: (context) => GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Scaffold(
+            body: Column(
+              children: [
+                const SizedBox(height: 120),
+                ElevatedButton(key: const ValueKey('go'), onPressed: () {}, child: const Text('Go')),
+                const SizedBox(height: 400),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await startPick(tester, h, 'element');
+    await tester.tapAt(const Offset(200, 500));
+    await settle(tester);
+    expect(h.panel!.of('viper:pick:result'), isEmpty);
+    expect(h.panel!.of('viper:pick:none').single['label'], 'Whole screen');
+
+    // A pick on the page has no step for the wrapper.
+    h.panel!.scripts.clear();
+    await startPick(tester, h, 'element');
+    await tester.tapAt(tester.getCenter(find.text('Go')));
+    await settle(tester);
+    final result = h.panel!.of('viper:pick:result').single;
+    expect(result['label'], 'Go button');
+    final path = ((result['context']! as Map<String, Object?>)['path']! as List).map((s) => (s as Map)['label']);
+    expect(path, ['Go button']);
+  });
+
+  testWidgets('a blank tap inside a ViperScreen is the whole screen, not the screen as an element', (tester) async {
+    final (h, _, _) = await pumpApp(
+      tester,
+      device: pixel9,
+      home: const ViperScreen(
+        name: 'Call sheet',
+        child: Scaffold(body: SizedBox.expand()),
+      ),
+    );
+    await startPick(tester, h, 'element');
+    await tester.tapAt(const Offset(200, 500));
+    await settle(tester);
+    expect(h.panel!.of('viper:pick:result'), isEmpty);
+    expect(h.panel!.of('viper:pick:none').single['scope'], 'screen');
+  });
 }

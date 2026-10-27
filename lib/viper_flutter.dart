@@ -53,11 +53,15 @@ abstract final class Viper {
   /// network, so the first frame and offline launches don't wait on Viper. Below iOS 16.4 and
   /// Android API 24 it does nothing (D338). [identity] asks the app's backend for a signed
   /// identity (D21, D86); [context] adds to every capture what `Viper.context` would (D27).
+  /// [revealHint] says the app has its own way to bring a hidden Viper back (`Viper.show` or
+  /// `Viper.open`), in the words the tester is told when they hide it: "Long-press the logo on
+  /// Account to bring it back." With it, "Hide Viper" is offered even where there's no shake (D371).
   static void start({
     required String key,
     required Uri host,
     Future<SignedIdentity?> Function()? identity,
     Map<String, Object?> Function()? context,
+    String? revealHint,
   }) {
     if (!viperDefined || _runtime != null) return;
     WidgetsFlutterBinding.ensureInitialized();
@@ -68,6 +72,7 @@ abstract final class Viper {
       host: host,
       identityCallback: identity,
       contextCallback: context,
+      revealHint: revealHint,
       activity: _activity,
       onStop: _console.release,
     );

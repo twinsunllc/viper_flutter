@@ -17,6 +17,7 @@ import 'support/fakes.dart';
 Future<(Harness, ViperRuntime)> pumpApp(
   WidgetTester tester, {
   MemoryStore? store,
+  String? revealHint,
   Widget? bottomBar,
   ConfigOutcome? outcome,
 }) async {
@@ -24,7 +25,7 @@ Future<(Harness, ViperRuntime)> pumpApp(
   tester.view.devicePixelRatio = 3;
   tester.view.padding = const FakeViewPadding(top: 177, bottom: 102);
   addTearDown(tester.view.reset);
-  final h = Harness(view: tester.view, store: store, outcome: outcome);
+  final h = Harness(view: tester.view, store: store, outcome: outcome, revealHint: revealHint);
   final runtime = h.runtime();
   addTearDown(runtime.dispose);
   await runtime.boot();
@@ -155,6 +156,33 @@ void main() {
     expect(find.text('Viper is hidden. Shake your phone to bring it back.'), findsOneWidget);
     await tester.pump(const Duration(seconds: 5));
     expect(find.textContaining('Viper is hidden'), findsNothing);
+  });
+
+  testWidgets("with the app's own way back, hiding is offered without a shake and says that way (D371)", (
+    tester,
+  ) async {
+    final (_, runtime) = await pumpApp(tester, revealHint: 'Long-press the logo on Account to bring it back.');
+    // A phone with no shake to listen for: only the app's way brings Viper back.
+    runtime.shakeAvailable = false;
+    await tester.longPress(launcher);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hide Viper'));
+    await tester.pump();
+    expect(runtime.layout.hidden, isTrue);
+    expect(find.text('Viper is hidden. Long-press the logo on Account to bring it back.'), findsOneWidget);
+    runtime.show();
+    await tester.pump();
+    expect(launcher, findsOneWidget);
+    // Back again, the note on how to bring it back goes at once rather than sitting over the sheet.
+    expect(find.textContaining('Viper is hidden'), findsNothing);
+  });
+
+  testWidgets('without a shake or a way back from the app, hiding is never offered (D335, D371)', (tester) async {
+    final (_, runtime) = await pumpApp(tester);
+    runtime.shakeAvailable = false;
+    await tester.longPress(launcher);
+    await tester.pumpAndSettle();
+    expect(find.text('Hide Viper'), findsNothing);
   });
 
   testWidgets('VoiceOver and TalkBack get the tuck action (D335)', (tester) async {

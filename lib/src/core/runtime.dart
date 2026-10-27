@@ -134,6 +134,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     required this.host,
     this.identityCallback,
     this.contextCallback,
+    String? revealHint,
     ViperServices? services,
     ScreenTracker? screens,
     Duration Function()? uptime,
@@ -142,6 +143,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   }) : services = services ?? ViperServices(),
        screens = screens ?? ScreenTracker(),
        activity = activity ?? ActivityLog(),
+       revealHint = revealHint?.trim().isEmpty ?? true ? null : revealHint!.trim(),
        _uptime = uptime;
 
   /// The console and the network calls a report carries (D333).
@@ -162,6 +164,18 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
 
   /// What the app adds to each capture, beside `Viper.context` (D27).
   final Map<String, Object?> Function()? contextCallback;
+
+  /// The app's own way to bring a hidden Viper back, in the words a tester is told when they hide
+  /// it (D371); null when the app has none.
+  final String? revealHint;
+
+  /// Whether "Hide Viper" is offered: only where something can bring it back, a shake (D335) or
+  /// the app's own `Viper.show` or `Viper.open` (D371).
+  bool get canHide => shakeAvailable || revealHint != null;
+
+  /// What a tester is told when they hide Viper: the app's way back when it has one, else a shake.
+  String get hiddenToast =>
+      revealHint == null ? 'Viper is hidden. Shake your phone to bring it back.' : 'Viper is hidden. $revealHint';
 
   /// Still asking the phone and Viper, or waiting to ask again: Viper may yet run.
   bool get _notReadyYet => phase == ViperPhase.starting || phase == ViperPhase.unreachable;
@@ -507,6 +521,11 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     layout = layout.copyWith(hidden: hidden);
     unawaited(services.store.writeJson(_launcherKey, layout.toJson()));
     if (hidden) closeSheet();
+    // Back again: the note on how to bring it back has done its job, and would sit over the sheet.
+    if (!hidden && toast == hiddenToast) {
+      _toastTimer?.cancel();
+      toast = null;
+    }
     notifyListeners();
   }
 

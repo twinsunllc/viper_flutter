@@ -82,7 +82,7 @@ class _ViperLauncherState extends State<ViperLauncher> {
   void _hide() {
     setState(() => _menu = false);
     _runtime.setHidden(true);
-    _runtime.showToast('Viper is hidden. Shake your phone to bring it back.');
+    _runtime.showToast(_runtime.hiddenToast);
   }
 
   @override
@@ -96,7 +96,7 @@ class _ViperLauncherState extends State<ViperLauncher> {
     final actions = <CustomSemanticsAction, VoidCallback>{
       CustomSemanticsAction(label: layout.tucked ? 'Show the round button' : 'Tuck to the edge'): () =>
           _tuck(!layout.tucked),
-      if (_runtime.shakeAvailable) const CustomSemanticsAction(label: 'Hide Viper'): _hide,
+      if (_runtime.canHide) const CustomSemanticsAction(label: 'Hide Viper'): _hide,
     };
 
     final Rect rect;
@@ -166,7 +166,7 @@ class _ViperLauncherState extends State<ViperLauncher> {
             anchor: rect,
             screen: size,
             tucked: layout.tucked,
-            canHide: _runtime.shakeAvailable,
+            canHide: _runtime.canHide,
             onTuck: () => _tuck(!layout.tucked),
             onHide: _hide,
             onCancel: () => setState(() => _menu = false),

@@ -253,16 +253,25 @@ class FakeOpener implements ViperOpener {
 /// Everything a test runtime needs, and handles on each.
 class Harness {
   /// A harness answering [outcome], on [device].
-  Harness({ConfigOutcome? outcome, DeviceFacts device = iphone, MemoryStore? store, this.screens, required this.view})
-    : api = FakeApi(outcome ?? ConfigOk(exampleConfig())),
-      store = store ?? MemoryStore(),
-      device = FakeDevice(device);
+  Harness({
+    ConfigOutcome? outcome,
+    DeviceFacts device = iphone,
+    MemoryStore? store,
+    this.screens,
+    this.revealHint,
+    required this.view,
+  }) : api = FakeApi(outcome ?? ConfigOk(exampleConfig())),
+       store = store ?? MemoryStore(),
+       device = FakeDevice(device);
 
   /// The view the runtime measures.
   final TestFlutterView view;
 
   /// Where the person is, when a test fixes it.
   final ScreenTracker? screens;
+
+  /// The app's own way back for a hidden Viper (D371), as Viper.start takes it.
+  final String? revealHint;
 
   /// The API.
   final FakeApi api;
@@ -302,6 +311,7 @@ class Harness {
     activity: activity,
     key: 'hbr_loc_9w',
     host: Uri.parse('http://localhost:4830'),
+    revealHint: revealHint,
     uptime: () => const Duration(seconds: 42),
     screens: screens,
     services: ViperServices(

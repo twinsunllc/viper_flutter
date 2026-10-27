@@ -547,6 +547,40 @@ void main() {
     expect(textOf(tester.element(find.byKey(const ValueKey('glyph'))), PrivacyLevel.standard), 'Call time 8:00 a.m.');
   });
 
+  testWidgets('a held finger aims first: outlined and named in the handle, sliding moves it, lifting picks it', (
+    tester,
+  ) async {
+    final (h, runtime, _) = await pumpApp(tester, device: pixel9);
+    await tester.tap(find.byKey(const ValueKey('edit-cast')));
+    await tester.pumpAndSettle();
+    await startPick(tester, h, 'element');
+    final aim = find.byKey(PickHandle.aimKey);
+    expect(tester.widget<Text>(aim).data, 'Tap what you mean');
+
+    final gesture = await tester.startGesture(tester.getCenter(find.text('Kalani Akana, lead')));
+    await tester.pump();
+    expect(runtime.picking, isTrue, reason: 'nothing is picked while the finger is down');
+    expect(tester.widget<Text>(aim).data, 'Kalani Akana, lead');
+    expect(find.text('Lift to pick it, or slide to something else'), findsOneWidget);
+    expect(find.byType(PickOutline), findsOneWidget);
+    expect(h.panel!.of('viper:pick:result'), isEmpty);
+
+    await gesture.moveTo(tester.getCenter(find.text('Save')));
+    await tester.pump();
+    expect(tester.widget<Text>(aim).data, 'Save button');
+    final outline = tester.getRect(find.byType(PickOutline));
+    expect(
+      outline.center,
+      offsetMoreOrLessEquals(tester.getCenter(find.byKey(const ValueKey('save-cast'))), epsilon: 1),
+    );
+
+    await gesture.up();
+    await settle(tester);
+    expect(runtime.picking, isFalse);
+    expect(runtime.aim.value, isNull);
+    expect(h.panel!.of('viper:pick:result').single['label'], 'Save button');
+  });
+
   testWidgets("an app's own tappable card picks as itself, named by what it shows; a tab isn't named twice", (
     tester,
   ) async {
@@ -609,7 +643,11 @@ void main() {
       ),
     );
     await startPick(tester, h, 'element');
-    await tester.tapAt(const Offset(200, 300));
+    final gesture = await tester.startGesture(const Offset(200, 300));
+    await tester.pump();
+    expect(tester.widget<Text>(find.byKey(PickHandle.aimKey)).data, 'Whole screen');
+    expect(find.byType(PickOutline), findsNothing);
+    await gesture.up();
     await settle(tester);
     expect(runtime.picking, isFalse);
     expect(h.panel!.of('viper:pick:result'), isEmpty);

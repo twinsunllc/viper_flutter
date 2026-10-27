@@ -835,8 +835,44 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     notifyListeners();
   }
 
+  /// What lifting the finger would pick, while it's down on the app (null otherwise): outlined
+  /// over the app and named in the handle, so a person sees what they'll get before they get it.
+  final ValueNotifier<PickAim?> aim = ValueNotifier<PickAim?>(null);
+  Map<RenderObject, Element>? _owners;
+  RenderObject? _aimTarget;
+
+  /// A finger down or moving while picking: aims at what's under it.
+  void aimAt(Offset position) {
+    final root = _appRoot;
+    if (!picking || root == null) return;
+    final target = targetAt(root, position);
+    // The same render object under the finger is the same pick: nothing to work out again.
+    if (target != null && identical(target, _aimTarget) && aim.value != null) return;
+    _aimTarget = target;
+    _owners ??= ownersOf(root);
+    final hit = target == null ? null : ownerOf(root, target, owners: _owners);
+    if (hit == null) {
+      aim.value = null;
+      return;
+    }
+    if (!nameable(hit)) {
+      aim.value = const PickAim('Whole screen', null);
+      return;
+    }
+    final step = pathFor(hit, _level).last;
+    aim.value = PickAim(step.label, _rectOf(step.element));
+  }
+
+  /// The finger left without picking (a cancelled touch), or the pick ended.
+  void clearAim() {
+    _owners = null;
+    _aimTarget = null;
+    aim.value = null;
+  }
+
   /// The handle's Whole screen: the pick is the screen (W03's edge choices).
   void pickWholeScreen() {
+    clearAim();
     if (!picking) return;
     picking = false;
     notifyListeners();
@@ -845,6 +881,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
 
   /// The handle's This dialog: the pick is the popup on top (W03).
   void pickDialog() {
+    clearAim();
     if (!picking) return;
     picking = false;
     notifyListeners();
@@ -853,6 +890,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
 
   /// The handle's Cancel, or Android's back while picking: back to the panel.
   void cancelPick() {
+    clearAim();
     if (!picking) return;
     _forgetPickShot();
     picking = false;
@@ -892,13 +930,19 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
   /// A tap while picking (W03): what's under it, and the path up from it.
   void pickAt(Offset position) {
     final root = _appRoot;
-    final hit = root == null ? null : elementAt(root, position);
-    if (hit == null) return;
+    final hit = root == null ? null : elementAt(root, position, owners: _owners);
+    _owners = null;
+    _aimTarget = null;
+    if (hit == null) {
+      aim.value = null;
+      return;
+    }
     // Nothing worth naming under the finger (the space between widgets): the whole screen.
     if (!nameable(hit)) {
       pickWholeScreen();
       return;
     }
+    aim.value = null;
     picking = false;
     _pickMode = 'element';
     _pickPath = pathFor(hit, _level);
@@ -910,6 +954,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
 
   /// A drawn box while picking (D39): the widget at its middle names it, the box is the anchor's.
   void pickBox(Rect rect) {
+    clearAim();
     final root = _appRoot;
     if (root == null || rect.width < 8 || rect.height < 8) return;
     final hit = elementAt(root, rect.center);
@@ -1367,6 +1412,7 @@ class ViperRuntime extends ChangeNotifier with WidgetsBindingObserver implements
     _stateWrite?.cancel();
     _toastTimer?.cancel();
     _api?.close();
+    aim.dispose();
     super.dispose();
   }
 }

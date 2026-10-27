@@ -4,7 +4,8 @@
 // breadcrumb offers. The label comes from what the widget says: its semantics, its text, its type.
 // An app's own tappable widget (an InkWell or GestureDetector that isn't part of a control) is a
 // thing worth naming too, so a custom card or row picks as itself; a tap on nothing worth naming
-// is the whole screen.
+// is the whole screen. While a finger is down the pick is aimed: what lifting would pick is
+// outlined and named first (PickAim).
 import 'package:flutter/cupertino.dart' show CupertinoNavigationBar, CupertinoTabBar;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -25,6 +26,26 @@ class PickedStep {
 
   /// Its widget's type, for staff: "ElevatedButton".
   final String widget;
+}
+
+/// What lifting the finger would pick, shown while it's down: its name, and its box on the
+/// screen (null for the whole screen).
+@immutable
+class PickAim {
+  /// An aim at [label], outlined at [rect].
+  const PickAim(this.label, this.rect);
+
+  /// "Save button", or "Whole screen".
+  final String label;
+
+  /// Where it is on the screen, in logical pixels.
+  final Rect? rect;
+
+  @override
+  bool operator ==(Object other) => other is PickAim && other.label == label && other.rect == rect;
+
+  @override
+  int get hashCode => Object.hash(label, rect);
 }
 
 /// Widgets a person means when they tap inside them, with the noun the label ends in.
@@ -122,21 +143,45 @@ const Set<String> _ownsTaps = {
 };
 
 /// The element under [position] in the app below [root] (logical pixels, on the screen), or null.
-Element? elementAt(Element root, Offset position) {
+/// [owners] (from [ownersOf]) saves walking the whole tree for each position of an aim.
+Element? elementAt(Element root, Offset position, {Map<RenderObject, Element>? owners}) {
+  final target = targetAt(root, position);
+  return target == null ? null : ownerOf(root, target, owners: owners);
+}
+
+/// The render object a tap at [position] lands on first, or null.
+RenderObject? targetAt(Element root, Offset position) {
   final render = root.findRenderObject();
   if (render is! RenderBox || !render.attached) return null;
   final result = BoxHitTestResult();
   render.hitTest(result, position: render.globalToLocal(position));
   // The first target that is a render object: a TextSpan answers before its RenderParagraph.
-  RenderObject? target;
   for (final entry in result.path) {
     final candidate = entry.target;
-    if (candidate is RenderObject) {
-      target = candidate;
-      break;
-    }
+    if (candidate is RenderObject) return candidate;
   }
-  if (target == null) return null;
+  return null;
+}
+
+/// Every render object below [root] with the element that owns it: built once when a finger
+/// goes down, so aiming as it moves is a lookup.
+Map<RenderObject, Element> ownersOf(Element root) {
+  final owners = Map<RenderObject, Element>.identity();
+  void visit(Element element) {
+    if (element is RenderObjectElement) owners[element.renderObject] = element;
+    element.visitChildElements(visit);
+  }
+
+  visit(root);
+  return owners;
+}
+
+/// The element that owns [target]: from [owners] while it's current, else by walking the tree.
+Element? ownerOf(Element root, RenderObject target, {Map<RenderObject, Element>? owners}) {
+  final known = owners?[target];
+  if (known != null && known.mounted && known is RenderObjectElement && identical(known.renderObject, target)) {
+    return known;
+  }
   Element? owner;
   void visit(Element element) {
     if (owner != null) return;

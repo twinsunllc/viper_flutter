@@ -1,8 +1,10 @@
 // While picking on a phone, the sheet is a handle across the bottom edge, where the thumb is
 // (D169, W13), and the rest of the screen is the app to tap: a tap picks what's under it, a drag
-// draws a box (D39). The handle offers the whole screen, the dialog on top (W03's edge choices),
-// or going back.
+// draws a box (D39). While the finger is down, what lifting it would pick is outlined and named
+// in the handle, and sliding moves the aim, so a person sees what they'll get under their finger.
+// The handle offers the whole screen, the dialog on top (W03's edge choices), or going back.
 import 'package:flutter/widgets.dart';
+import 'package:viper_flutter/src/core/pick.dart';
 import 'package:viper_flutter/src/core/runtime.dart';
 import 'package:viper_flutter/src/ui/tokens.dart';
 
@@ -22,9 +24,56 @@ class _PickCatcherState extends State<PickCatcher> {
   Offset? _start;
   Offset? _end;
 
+  /// The finger that's aiming; a second finger is ignored.
+  int? _pointer;
+
   @override
   Widget build(BuildContext context) {
-    final box = widget.runtime.pickMode == 'box';
+    final runtime = widget.runtime;
+    if (runtime.pickMode != 'box') {
+      // A tap picks on lift; a held finger aims first, outlined and named, and slides to change it.
+      return Positioned.fill(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Semantics(
+                label: 'Tap what you mean',
+                child: Listener(
+                  behavior: HitTestBehavior.opaque,
+                  onPointerDown: (event) {
+                    if (_pointer != null) return;
+                    _pointer = event.pointer;
+                    runtime.aimAt(event.position);
+                  },
+                  onPointerMove: (event) {
+                    if (event.pointer == _pointer) runtime.aimAt(event.position);
+                  },
+                  onPointerUp: (event) {
+                    if (event.pointer != _pointer) return;
+                    _pointer = null;
+                    runtime.pickAt(event.position);
+                  },
+                  onPointerCancel: (event) {
+                    if (event.pointer != _pointer) return;
+                    _pointer = null;
+                    runtime.clearAim();
+                  },
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ),
+            ValueListenableBuilder<PickAim?>(
+              valueListenable: runtime.aim,
+              builder: (context, aim, _) {
+                final rect = aim?.rect;
+                return rect == null ? const SizedBox.shrink() : PickOutline(rect: rect);
+              },
+            ),
+          ],
+        ),
+      );
+    }
+    final box = runtime.pickMode == 'box';
     final rect = _start != null && _end != null ? Rect.fromPoints(_start!, _end!) : null;
     return Positioned.fill(
       child: Semantics(
@@ -111,6 +160,9 @@ class PickHandle extends StatelessWidget {
   /// The handle's This dialog button.
   static const ValueKey<String> dialogKey = ValueKey<String>('viper-pick-dialog');
 
+  /// The handle's line naming what's aimed at, or what to do.
+  static const ValueKey<String> aimKey = ValueKey<String>('viper-pick-aim');
+
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
@@ -130,13 +182,33 @@ class PickHandle extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Semantics(
-              liveRegion: true,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Text(
-                  words,
-                  style: const TextStyle(color: Color(0xFFFFFFFF), fontSize: 15, fontWeight: FontWeight.w600),
+            ValueListenableBuilder<PickAim?>(
+              valueListenable: runtime.aim,
+              builder: (context, aim, _) => Semantics(
+                liveRegion: true,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        aim?.label ?? words,
+                        key: aimKey,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Color(0xFFFFFFFF), fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                      if (runtime.pickMode != 'box') ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          aim != null
+                              ? 'Lift to pick it, or slide to something else'
+                              : "Or hold and slide to see what you'd pick",
+                          style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 13),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ),
